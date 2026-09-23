@@ -45,6 +45,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { background: var(--desk); }
 body {
   margin: 0;
@@ -438,8 +439,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: absolute;
   left: 50%;
   bottom: 80px;
-  width: 540px;
-  margin-left: -270px;
+  width: 500px;
+  margin-left: -250px;
   padding: 22px 30px 20px;
   border-radius: 6px;
   background: linear-gradient(170deg, #f1eadb, #ddd3bd);
@@ -495,6 +496,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(#2a2622, #151311);
   box-shadow: 0 3px 5px rgba(0, 0, 0, .55);
 }
+.spares {
+  position: absolute;
+  left: 18px;
+  bottom: 64px;
+  width: 200px;
+  height: 180px;
+}
+.spare { position: absolute; width: 138px; height: 138px; cursor: grab; touch-action: none; }
+.spare:nth-child(1) { left: 0; top: 0; }
+.spare:nth-child(2) { left: 58px; top: 38px; transform: rotate(24deg); }
 .bulb {
   width: 26px;
   height: 58px;
@@ -613,11 +624,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .cables {
   position: absolute;
   left: 0;
-  top: 0;
+  top: -90px;
   width: 1011px;
-  height: 540px;
+  height: 660px;
   pointer-events: none;
 }
+.front, .flap { touch-action: none; }
+.socket.pending .socket-plate { box-shadow: 0 0 0 3px var(--amber), 0 0 14px 3px rgba(255, 181, 46, .45); }
 
 /* ---------------------------------------------------------------------------
    Paper on the desk: key sheet, archive card, message pad
@@ -754,6 +767,19 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="plug-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a4540"/><stop offset=".4" stop-color="#1b1917"/><stop offset="1" stop-color="#060606"/></linearGradient>
+    <symbol id="spare-coil" viewBox="0 0 150 150">
+      <path d="M40 116 C 8 106, 6 52, 44 34 S 124 22, 132 66 S 108 128, 74 122 S 30 92, 52 64 S 104 50, 108 82" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="12" transform="translate(4 6)"/>
+      <path d="M40 116 C 8 106, 6 52, 44 34 S 124 22, 132 66 S 108 128, 74 122 S 30 92, 52 64 S 104 50, 108 82" fill="none" stroke="#1c1815" stroke-width="11" stroke-linecap="round"/>
+      <path d="M40 116 C 8 106, 6 52, 44 34 S 124 22, 132 66 S 108 128, 74 122 S 30 92, 52 64 S 104 50, 108 82" fill="none" stroke="#9c8a74" stroke-opacity=".25" stroke-width="8" stroke-dasharray="2.4 2.8"/>
+      <g transform="translate(40 116) rotate(160)"><rect x="-6" y="-14" width="44" height="28" rx="8" fill="url(#plug-body)"/><rect x="36" y="-9" width="12" height="6" fill="#c9ad69"/><rect x="36" y="3" width="12" height="4" fill="#c9ad69"/></g>
+      <g transform="translate(108 82) rotate(-70)"><rect x="-6" y="-14" width="44" height="28" rx="8" fill="url(#plug-body)"/><rect x="36" y="-9" width="12" height="6" fill="#c9ad69"/><rect x="36" y="3" width="12" height="4" fill="#c9ad69"/></g>
+      <rect x="62" y="20" width="26" height="12" rx="3" fill="#b99a57"/>
+    </symbol>
+  </defs>
+</svg>
 <div class="room">
   <header class="masthead">
     <h1><span>Chiffriermaschine</span> Enigma</h1>
@@ -831,6 +857,10 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
                     </ol>
                   </div>
                   <div class="bulbs"><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span></div>
+                  <div class="spares">
+                    <svg class="spare" viewBox="0 0 150 150" role="img" aria-label="Spare plug cable: drag it to the plugboard"><use href="#spare-coil"/></svg>
+                    <svg class="spare" viewBox="0 0 150 150" role="img" aria-label="Spare plug cable: drag it to the plugboard"><use href="#spare-coil"/></svg>
+                  </div>
                 </div>
               </div>
               <div class="plate" id="plate"></div>
@@ -1703,7 +1733,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
         socket.append(el('span', { class: 'socket-label' }, ch), el('span', { class: 'socket-plate' }));
         board.append(socket);
         // Socket centre in the cable canvas's coordinates (the thick hole).
-        view.sockets.set(ch, { node: socket, x: 45 + x, y: 30 + rowsY[r] + 5 });
+        view.sockets.set(ch, { node: socket, x: 45 + x, y: 30 + rowsY[r] + 8 });
       });
     });
   }
@@ -1737,6 +1767,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       const scale = Math.min(1.25, wrap.clientWidth / 1100);
       scene.style.transform = `scale(${scale})`;
       wrap.style.height = `${Math.ceil(height * scale)}px`;
+      sizeCables(scale);
     };
     fit();
     new ResizeObserver(fit).observe(wrap);
@@ -1771,8 +1802,14 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   // ---------------------------------------------------------------------------
   // Controller. The engine is the single source of truth; the view follows.
   // ---------------------------------------------------------------------------
+  // The machine opens set to a real daily key with ten cables: the one used for
+  // the Operation Barbarossa message of 7 July 1941 (RESEARCH.md §2.2, H2).
+  const DEFAULT_KEY = Object.freeze({
+    model: 'I', reflector: 'B', rotors: ['II', 'IV', 'V'], rings: '02 21 12',
+    positions: 'BLA', plugboard: 'AV BS CG DL FU HZ IN KM OW RX',
+  });
   const state = {
-    machine: new E.Machine({ model: 'I' }),
+    machine: new E.Machine(DEFAULT_KEY),
     down: null,          // letter of the key being held
     lit: null,           // letter of the lit lamp
     power: 0,            // index into POWER
@@ -1995,6 +2032,630 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     hintShown = false;
   }
 
+  // ---------------------------------------------------------------------------
+  // Plugboard cables: Verlet ropes you can drag between sockets (§1.6, §4.5)
+  // ---------------------------------------------------------------------------
+  // About 20 cm of fabric cable plus the plug bodies. Far corner pairs pull the
+  // cable nearly taut (see docs/milestone-reviews.md, M4).
+  const CAN = { w: 1011, h: 660, top: -90 };
+  const ROPE = { length: 680, n: 30 };
+  const FLOOR = 512;
+  const PLUG = { w: 40, h: 52 };
+  const SUPPLIED = 12; // cables supplied with an Enigma I (RESEARCH.md §1.6)
+  const cables = [];
+  const cv = { canvas: null, ctx: null, scale: 1 };
+  let held = null;
+  let hover = null;
+  let pending = null;
+  let calm = 0;
+  let suppressClick = false;
+
+  function makeCable() {
+    const n = ROPE.n + 1;
+    const cable = {
+      id: cables.length,
+      ends: [{ socket: null }, { socket: null }],
+      flight: [null, null],
+      x: new Float32Array(n), y: new Float32Array(n),
+      px: new Float32Array(n), py: new Float32Array(n),
+      tone: 0.85 + 0.3 * mulberry32(cables.length + 7)(),
+    };
+    cables.push(cable);
+    return cable;
+  }
+
+  const endIndex = (k) => (k === 0 ? 0 : ROPE.n);
+  const socketAt = (letter) => view.sockets.get(letter);
+
+  // Lay a cable along a path given as a function of t ∈ [0, 1], resampled to
+  // equal arc lengths so the rope starts at its natural length.
+  function layAlong(cable, path) {
+    const samples = 400;
+    const pts = [];
+    let total = 0;
+    let prev = path(0);
+    pts.push({ ...prev, d: 0 });
+    for (let i = 1; i <= samples; i++) {
+      const p = path(i / samples);
+      total += Math.hypot(p.x - prev.x, p.y - prev.y);
+      pts.push({ ...p, d: total });
+      prev = p;
+    }
+    let j = 0;
+    for (let i = 0; i <= ROPE.n; i++) {
+      const d = (i / ROPE.n) * total;
+      while (j < pts.length - 2 && pts[j + 1].d < d) j++;
+      const a = pts[j];
+      const b = pts[j + 1];
+      const f = b.d > a.d ? (d - a.d) / (b.d - a.d) : 0;
+      cable.x[i] = cable.px[i] = lerp(a.x, b.x, f);
+      cable.y[i] = cable.py[i] = lerp(a.y, b.y, f);
+    }
+  }
+
+  function hangBetween(cable, a, b) {
+    const A = socketAt(a);
+    const B = socketAt(b);
+    const span = Math.hypot(B.x - A.x, B.y - A.y);
+    const sag = Math.max(40, (ROPE.length - span) / 2);
+    layAlong(cable, (t) => ({ x: lerp(A.x, B.x, t), y: lerp(A.y, B.y, t) + sag * Math.sin(Math.PI * t) }));
+  }
+
+  // A cable taken out of the lid: it hangs from where the hand holds it.
+  function layFromAbove(cable, x, y) {
+    layAlong(cable, (t) => ({ x: x + Math.sin(t * 5) * 30 * t, y: y - t * ROPE.length * 0.6 }));
+  }
+
+  function occupant(letter, except) {
+    for (const cable of cables) {
+      for (const k of [0, 1]) {
+        const end = cable.ends[k];
+        if (end.socket === letter && !(except && except.cable === cable && except.k === k)) return { cable, k };
+      }
+    }
+    return null;
+  }
+
+  // Where an end is pinned this frame: in a socket, in the hand, or in flight.
+  function pinOf(cable, k, now) {
+    const f = cable.flight[k];
+    if (f) {
+      const t = clamp((now - f.t0) / f.dur, 0, 1);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      const to = socketAt(f.to);
+      return { x: lerp(f.x, to.x, e), y: lerp(f.y, to.y, e) - Math.sin(Math.PI * e) * 60 };
+    }
+    if (held && held.cable === cable && held.k === k && held.lifted) {
+      if (hover) return socketAt(hover);
+      return { x: held.x, y: held.y };
+    }
+    const socket = cable.ends[k].socket;
+    return socket ? socketAt(socket) : null;
+  }
+
+  function simulate(now, dt) {
+    const g = 2600;
+    const seg = ROPE.length / ROPE.n;
+    let motion = 0;
+    for (const c of cables) {
+      const pins = [pinOf(c, 0, now), pinOf(c, 1, now)];
+      for (let i = 0; i <= ROPE.n; i++) {
+        const pin = i === 0 ? pins[0] : i === ROPE.n ? pins[1] : null;
+        if (pin) {
+          c.px[i] = c.x[i];
+          c.py[i] = c.y[i];
+          c.x[i] = pin.x;
+          c.y[i] = pin.y;
+          continue;
+        }
+        const grounded = c.y[i] >= FLOOR - 0.5;
+        const damp = reducedMotion ? 0.94 : 0.992;
+        const vx = (c.x[i] - c.px[i]) * (grounded ? 0.55 : damp);
+        const vy = (c.y[i] - c.py[i]) * damp;
+        motion = Math.max(motion, Math.abs(vx) + Math.abs(vy));
+        c.px[i] = c.x[i];
+        c.py[i] = c.y[i];
+        c.x[i] += vx;
+        c.y[i] += vy + g * dt * dt;
+      }
+      const fixed = (i) => (i === 0 && pins[0]) || (i === ROPE.n && pins[1]);
+      for (let iter = 0; iter < 22; iter++) {
+        for (let i = 0; i < ROPE.n; i++) {
+          const dx = c.x[i + 1] - c.x[i];
+          const dy = c.y[i + 1] - c.y[i];
+          const d = Math.hypot(dx, dy) || 0.0001;
+          const diff = (d - seg) / d;
+          const wa = fixed(i) ? 0 : 1;
+          const wb = fixed(i + 1) ? 0 : 1;
+          if (wa + wb === 0) continue;
+          const ka = (wa / (wa + wb)) * diff;
+          const kb = (wb / (wa + wb)) * diff;
+          c.x[i] += dx * ka;
+          c.y[i] += dy * ka;
+          c.x[i + 1] -= dx * kb;
+          c.y[i + 1] -= dy * kb;
+        }
+        // A little bending stiffness: fabric cable doesn't fold sharply.
+        for (let i = 0; i < ROPE.n - 1; i++) {
+          const dx = c.x[i + 2] - c.x[i];
+          const dy = c.y[i + 2] - c.y[i];
+          const d = Math.hypot(dx, dy) || 0.0001;
+          const min = seg * 1.55;
+          if (d >= min) continue;
+          const k = ((min - d) / d) * 0.12;
+          if (!fixed(i)) { c.x[i] -= dx * k; c.y[i] -= dy * k; }
+          if (!fixed(i + 2)) { c.x[i + 2] += dx * k; c.y[i + 2] += dy * k; }
+        }
+        for (let i = 0; i <= ROPE.n; i++) {
+          if (fixed(i)) continue;
+          if (c.y[i] > FLOOR) c.y[i] = FLOOR;
+          if (c.y[i] < CAN.top + 12) c.y[i] = CAN.top + 12;
+          c.x[i] = clamp(c.x[i], -30, CAN.w + 30);
+        }
+      }
+    }
+    return motion;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function tracePath(ctx, c, dx = 0, dy = 0) {
+    ctx.beginPath();
+    ctx.moveTo(c.x[0] + dx, c.y[0] + dy);
+    for (let i = 1; i < ROPE.n; i++) {
+      const mx = (c.x[i] + c.x[i + 1]) / 2;
+      const my = (c.y[i] + c.y[i + 1]) / 2;
+      ctx.quadraticCurveTo(c.x[i] + dx, c.y[i] + dy, mx + dx, my + dy);
+    }
+    ctx.lineTo(c.x[ROPE.n] + dx, c.y[ROPE.n] + dy);
+  }
+
+  // A plug seen from the front while seated: the rear of a black bakelite
+  // body, the cable leaving from its lower half.
+  function drawSeatedPlug(ctx, x, y, lifted) {
+    const w = PLUG.w * (lifted ? 1.08 : 1);
+    const h = PLUG.h * (lifted ? 1.08 : 1);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.6)';
+    ctx.shadowBlur = lifted ? 18 : 7;
+    ctx.shadowOffsetX = lifted ? 8 : 3;
+    ctx.shadowOffsetY = lifted ? 14 : 5;
+    const body = ctx.createLinearGradient(x - w / 2, y - h / 2, x + w / 2, y + h / 2);
+    body.addColorStop(0, '#4a4540');
+    body.addColorStop(0.35, '#1d1a18');
+    body.addColorStop(1, '#070606');
+    ctx.fillStyle = body;
+    roundRect(ctx, x - w / 2, y - h / 2, w, h, 13);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,.85)';
+    ctx.lineWidth = 1.2;
+    roundRect(ctx, x - w / 2, y - h / 2, w, h, 13);
+    ctx.stroke();
+    // grip ridges
+    for (let i = -1; i <= 1; i++) {
+      ctx.fillStyle = 'rgba(255,255,255,.07)';
+      ctx.fillRect(x - w / 2 + 7, y - 6 + i * 7, w - 14, 1.2);
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(x - w / 2 + 7, y - 4.8 + i * 7, w - 14, 1.2);
+    }
+    const shine = ctx.createRadialGradient(x - w * 0.2, y - h * 0.28, 1, x - w * 0.2, y - h * 0.28, w * 0.45);
+    shine.addColorStop(0, 'rgba(255,255,255,.35)');
+    shine.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shine;
+    roundRect(ctx, x - w / 2, y - h / 2, w, h, 13);
+    ctx.fill();
+    // strain relief where the cable leaves
+    ctx.fillStyle = '#0d0c0b';
+    ctx.beginPath();
+    ctx.ellipse(x, y + h * 0.22, 8, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // A loose plug lying or dangling: seen from the side, pins showing.
+  function drawLoosePlug(ctx, c, k, lifted) {
+    const i = endIndex(k);
+    const j = k === 0 ? 1 : ROPE.n - 1;
+    const angle = Math.atan2(c.y[i] - c.y[j], c.x[i] - c.x[j]);
+    const len = 50 * (lifted ? 1.08 : 1);
+    const thick = 30 * (lifted ? 1.08 : 1);
+    ctx.save();
+    ctx.translate(c.x[i], c.y[i]);
+    ctx.rotate(angle);
+    ctx.shadowColor = 'rgba(0,0,0,.55)';
+    ctx.shadowBlur = lifted ? 16 : 6;
+    ctx.shadowOffsetX = lifted ? 7 : 3;
+    ctx.shadowOffsetY = lifted ? 12 : 4;
+    const body = ctx.createLinearGradient(0, -thick / 2, 0, thick / 2);
+    body.addColorStop(0, '#46413c');
+    body.addColorStop(0.4, '#1b1816');
+    body.addColorStop(1, '#050505');
+    ctx.fillStyle = body;
+    roundRect(ctx, -8, -thick / 2, len, thick, 9);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // two pins at the front: thick (4 mm) above, thin (3 mm) below
+    const pin = ctx.createLinearGradient(0, -6, 0, 6);
+    pin.addColorStop(0, '#f4ecd3');
+    pin.addColorStop(0.5, '#b39a5c');
+    pin.addColorStop(1, '#5f4c22');
+    ctx.fillStyle = pin;
+    ctx.fillRect(len - 8, -9, 16, 7);
+    ctx.fillRect(len - 8, 3, 16, 5);
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, -8, -thick / 2, len, thick, 9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCables() {
+    const { ctx } = cv;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, CAN.w, CAN.h);
+    ctx.save();
+    ctx.translate(0, -CAN.top);
+    // Socket highlights
+    for (const letter of [pending, hover]) {
+      if (!letter) continue;
+      const s = socketAt(letter);
+      const glow = ctx.createRadialGradient(s.x, s.y, 10, s.x, s.y, 46);
+      glow.addColorStop(0, 'rgba(255,190,70,.55)');
+      glow.addColorStop(1, 'rgba(255,190,70,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(s.x - 50, s.y - 50, 100, 100);
+    }
+    const order = [...cables].sort((a, b) => (held?.cable === a) - (held?.cable === b));
+    // Shadows, then bodies, then plugs, so plugs sit on top of every cable.
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const c of order) {
+      tracePath(ctx, c, 6, 11);
+      ctx.strokeStyle = 'rgba(0,0,0,.28)';
+      ctx.lineWidth = 13;
+      ctx.stroke();
+    }
+    for (const c of order) {
+      tracePath(ctx, c);
+      const t = c.tone;
+      ctx.strokeStyle = `rgb(${Math.round(27 * t)},${Math.round(23 * t)},${Math.round(20 * t)})`;
+      ctx.lineWidth = 12;
+      ctx.stroke();
+      ctx.setLineDash([2.4, 2.8]);
+      ctx.strokeStyle = 'rgba(150,128,104,.22)';
+      ctx.lineWidth = 9;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      tracePath(ctx, c, -1.6, -2.2);
+      ctx.strokeStyle = 'rgba(255,236,208,.16)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    const now = performance.now();
+    for (const c of order) {
+      for (const k of [0, 1]) {
+        const lifted = held && held.cable === c && held.k === k && held.lifted;
+        const i = endIndex(k);
+        if (c.ends[k].socket || (lifted && hover)) {
+          const at = lifted ? socketAt(hover) : socketAt(c.ends[k].socket);
+          drawSeatedPlug(ctx, at.x, at.y, lifted);
+        } else if (c.flight[k]) {
+          const p = pinOf(c, k, now);
+          drawSeatedPlug(ctx, p.x, p.y, true);
+        } else {
+          drawLoosePlug(ctx, c, k, lifted);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  function cableTask(now) {
+    const dt = 1 / 120;
+    let motion = 0;
+    for (let i = 0; i < 2; i++) motion = Math.max(motion, simulate(now, dt));
+    let flying = false;
+    for (const c of cables) {
+      for (const k of [0, 1]) {
+        const f = c.flight[k];
+        if (!f) continue;
+        if (now - f.t0 >= f.dur) {
+          c.flight[k] = null;
+          c.ends[k].socket = f.to;
+          sound.plugIn();
+          f.done?.();
+        } else flying = true;
+      }
+    }
+    drawCables();
+    calm = motion < 0.03 && !flying && !held ? calm + 1 : 0;
+    return calm < 45;
+  }
+
+  function wake() {
+    calm = 0;
+    animate(cableTask);
+  }
+
+  // The engine follows the cables: both ends seated make a pair; a seated end
+  // whose partner is loose leaves its socket open (SPEC §3.3).
+  function applyPlugs() {
+    const pairs = [];
+    const open = [];
+    for (const c of cables) {
+      const [a, b] = c.ends.map((e) => e.socket);
+      if (a && b) pairs.push(a + b);
+      else if (a || b) open.push(a || b);
+    }
+    const m = state.machine;
+    m.setOpen('');
+    m.setPlugboard(pairs);
+    m.setOpen(open);
+    emit('plugboard', { pairs, open });
+  }
+
+  function nearestFreeSocket(p, radius) {
+    let best = null;
+    let bestD = radius;
+    for (const [letter, s] of view.sockets) {
+      const d = Math.hypot(p.x - s.x, p.y - s.y);
+      if (d < bestD && !occupant(letter, held)) {
+        best = letter;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  function hitPlug(p) {
+    const order = [...cables].reverse();
+    for (const c of order) {
+      for (const k of [0, 1]) {
+        if (c.flight[k]) continue;
+        const socket = c.ends[k].socket;
+        const i = endIndex(k);
+        const x = socket ? socketAt(socket).x : c.x[i];
+        const y = socket ? socketAt(socket).y : c.y[i];
+        const rx = socket ? PLUG.w / 2 + 4 : 30;
+        const ry = socket ? PLUG.h / 2 + 4 : 30;
+        if (Math.abs(p.x - x) <= rx && Math.abs(p.y - y) <= ry) return { cable: c, k };
+      }
+    }
+    return null;
+  }
+
+  function toMachine(e) {
+    const r = cv.canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / r.width) * CAN.w,
+      y: ((e.clientY - r.top) / r.height) * CAN.h + CAN.top,
+    };
+  }
+
+  function plugNote(text) {
+    padNote(text);
+    live.textContent = text;
+  }
+
+  function bindCables() {
+    const machine = $('#machine');
+    machine.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || held) return;
+      const p = toMachine(e);
+      const hit = hitPlug(p);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClick = true;
+      machine.setPointerCapture(e.pointerId);
+      held = { ...hit, id: e.pointerId, x: p.x, y: p.y, start: p, from: hit.cable.ends[hit.k].socket, lifted: false };
+      machine.style.cursor = 'grabbing';
+      wake();
+    }, true);
+
+    machine.addEventListener('pointermove', (e) => {
+      if (!held) {
+        if (e.pointerType === 'mouse' && cv.canvas) machine.style.cursor = hitPlug(toMachine(e)) ? 'grab' : '';
+        return;
+      }
+      if (e.pointerId !== held.id) return;
+      const p = toMachine(e);
+      held.x = clamp(p.x, -20, CAN.w + 20);
+      held.y = clamp(p.y, CAN.top + 14, FLOOR);
+      if (!held.lifted && Math.hypot(p.x - held.start.x, p.y - held.start.y) > 5) {
+        held.lifted = true;
+        const end = held.cable.ends[held.k];
+        if (end.socket) {
+          end.socket = null;
+          applyPlugs();
+          sound.plugOut();
+        } else {
+          // lifting a loose plug off the flap
+          const i = endIndex(held.k);
+          held.cable.px[i] = held.cable.x[i];
+          held.cable.py[i] = held.cable.y[i];
+        }
+      }
+      if (held.lifted) hover = nearestFreeSocket(p, 46);
+      wake();
+    });
+
+    const drop = (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      const end = held.cable.ends[held.k];
+      if (held.lifted) {
+        if (hover) {
+          end.socket = hover;
+          sound.plugIn();
+          const partner = held.cable.ends[1 - held.k].socket;
+          plugNote(partner ? `Cable joins ${hover} and ${partner}.` : `${hover} is plugged, but the other end is loose, so ${hover} is dead until you plug it in.`);
+        } else {
+          const i = endIndex(held.k);
+          held.cable.x[i] = held.x;
+          held.cable.y[i] = held.y;
+          held.cable.px[i] = held.x;
+          held.cable.py[i] = held.y;
+        }
+        applyPlugs();
+      }
+      held = null;
+      hover = null;
+      machine.style.cursor = '';
+      setTimeout(() => { suppressClick = false; }, 0);
+      wake();
+    };
+    machine.addEventListener('pointerup', drop);
+    machine.addEventListener('pointercancel', drop);
+    machine.addEventListener('lostpointercapture', (e) => drop(e));
+
+    // Drag a spare cable out of its clip in the lid.
+    document.querySelectorAll('.spare').forEach((node) => {
+      node.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || held) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const p = toMachine(e);
+        p.y = Math.max(p.y, CAN.top + 14);
+        const cable = takeFromLid(p.x, p.y);
+        if (!cable) return;
+        machine.setPointerCapture(e.pointerId);
+        held = { cable, k: 0, id: e.pointerId, x: p.x, y: p.y, start: p, from: null, lifted: true };
+        sound.plugOut();
+        wake();
+      }, true);
+    });
+
+    // Click (or Enter) on sockets: pick two empty sockets to join them with a
+    // spare cable; pick a plugged socket to take its cable out.
+    for (const [letter, s] of view.sockets) {
+      s.node.addEventListener('click', () => {
+        if (suppressClick) return;
+        socketClick(letter);
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && pending) setPending(null);
+    });
+  }
+
+  function setPending(letter) {
+    if (pending) socketAt(pending).node.classList.remove('pending');
+    pending = letter;
+    if (letter) socketAt(letter).node.classList.add('pending');
+    wake();
+  }
+
+  function socketClick(letter) {
+    const occ = occupant(letter);
+    if (occ) {
+      setPending(null);
+      removeCable(occ.cable);
+      plugNote(`Cable taken out of ${occ.cable.ends.map((e) => e.socket).filter(Boolean).join('') || letter}.`);
+      return;
+    }
+    if (!pending) {
+      setPending(letter);
+      plugNote(`Socket ${letter} chosen: now choose the socket to join it to.`);
+      return;
+    }
+    if (pending === letter) return setPending(null);
+    const a = pending;
+    setPending(null);
+    if (!connect(a, letter)) plugNote(`All ${SUPPLIED} cables are in use. Take one out first.`);
+  }
+
+  const lidSpares = () => SUPPLIED - cables.length;
+
+  function renderLidSpares() {
+    // SVG elements have no .hidden property; toggle the attribute itself.
+    document.querySelectorAll('.spare').forEach((node, i) => node.toggleAttribute('hidden', i >= lidSpares()));
+  }
+
+  function takeFromLid(x, y) {
+    if (lidSpares() <= 0) return null;
+    const cable = makeCable();
+    layFromAbove(cable, x, y);
+    renderLidSpares();
+    emit('plugboard', {});
+    return cable;
+  }
+
+  function spareCable() {
+    return cables.find((c) => !c.ends[0].socket && !c.ends[1].socket && !c.flight[0] && !c.flight[1] && held?.cable !== c)
+      ?? takeFromLid(505, CAN.top + 20);
+  }
+
+  function connect(a, b, delay = 0) {
+    const cable = spareCable();
+    if (!cable) return false;
+    const now = performance.now() + delay;
+    [a, b].forEach((letter, k) => {
+      const i = endIndex(k);
+      cable.flight[k] = { x: cable.x[i], y: cable.y[i], to: letter, t0: now + k * 90, dur: reducedMotion ? 1 : 420, done: () => applyPlugs() };
+    });
+    wake();
+    return true;
+  }
+
+  function removeCable(cable) {
+    for (const end of cable.ends) end.socket = null;
+    sound.plugOut();
+    applyPlugs();
+    wake();
+  }
+
+  // Rewire the plugboard to exactly these pairs, animating the changes.
+  function setPairs(pairs) {
+    const want = new Map(pairs.map((p) => [[...p].sort().join(''), p]));
+    for (const c of cables) {
+      const key = c.ends.map((e) => e.socket).filter(Boolean).sort().join('');
+      if (key.length === 2 && want.has(key)) want.delete(key);
+      else if (c.ends.some((e) => e.socket)) for (const e of c.ends) e.socket = null;
+    }
+    applyPlugs();
+    let delay = 0;
+    for (const pair of want.values()) {
+      connect(pair[0], pair[1], delay);
+      delay += 110;
+    }
+    wake();
+  }
+
+  function initCables(pairs) {
+    cv.canvas = $('#cables');
+    cv.ctx = cv.canvas.getContext('2d');
+    cables.length = 0;
+    pairs.slice(0, SUPPLIED).forEach((pair) => {
+      const c = makeCable();
+      c.ends[0].socket = pair[0];
+      c.ends[1].socket = pair[1];
+      hangBetween(c, pair[0], pair[1]);
+    });
+    const t = performance.now();
+    for (let i = 0; i < 360; i++) simulate(t, 1 / 120);
+    applyPlugs();
+    renderLidSpares();
+  }
+
+  function sizeCables(scale) {
+    if (!cv.canvas) return;
+    const d = Math.min(3, (window.devicePixelRatio || 1) * scale);
+    cv.canvas.width = Math.round(CAN.w * d);
+    cv.canvas.height = Math.round(CAN.h * d);
+    cv.ctx.setTransform(d, 0, 0, d, 0, 0);
+    drawCables();
+  }
+
   // Wiring the interactions ---------------------------------------------------
   const isField = (t) => t instanceof Element && t.closest('input, textarea, select, [contenteditable="true"]');
 
@@ -2104,6 +2765,8 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     release,
     type: feed,
     turn,
+    setPairs,
+    get cables() { return cables.map((c) => c.ends.map((e) => e.socket)); },
     setPower: (id) => setPower(POWER.findIndex((p) => p.id === id)),
     on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
   });
@@ -2115,8 +2778,10 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   buildPlate(state.machine.model);
   buildPlugboard();
   layoutScene();
+  initCables(state.machine.pairs());
   bindKeys();
   bindWheels();
+  bindCables();
   bindGlobal();
   setPower(0);
   syncRotors({ immediate: true });

@@ -105,3 +105,52 @@ Mismatches found in the screenshots, and the fixes:
   gradient, the letter colour and the bloom were redone to match.
 * Left for M5: the key-sheet fields are still empty, one sheet button label
   wraps, and the pad subtitle runs under the "FUNK" stamp.
+
+## M4: Plugboard and cables
+
+![A plug lifted out of V and held over the board](screenshots/m4-plugboard/machine.jpg)
+
+* **Physics:** each cable is a 30-segment Verlet rope with gravity, light
+  bending stiffness and friction where it rests on the flap. Seated plugs pin
+  their ends to the sockets, and a held plug pins its end to the pointer. The
+  simulation sleeps once everything is still.
+* **Behaviour vs research (§1.6, §4.5):** both ends seated make a reciprocal
+  pair. A plug pulled from one end leaves a **loose end**: the socket still
+  holding the other plug has its shorting bar lifted, so it is an **open
+  circuit**. The engine models this, so no lamp lights and the pad explains
+  why. The rotors still step. Twelve cables are supplied: ten plugged (1939+
+  practice) and **two spares clipped in the lid**, as on the Sotheby's machine.
+  A spare can be dragged straight out of the lid.
+* **Interaction:** drag a plug between sockets; drop it anywhere else and it
+  falls and dangles; click (or press Enter on) two empty sockets to join them
+  with a spare; press Enter on a plugged socket to take its cable out (for
+  keyboard and touch users).
+* **E2E:** 13/13 pass. The six new tests cover the default wiring, drag
+  rewiring with typing that follows it, a loose end giving no lamp while the
+  rotors still step, click-to-connect with a lid spare, taking a cable out
+  with the keyboard, and dragging a spare from the lid.
+
+Mismatches found and fixed:
+
+1. **Cables fell straight down into a zig-zag tangle** on the flap. The first
+   model stopped all motion in a "flap zone", which folded the ropes. Real
+   photographs show U-loops hanging in front of the panel, so gravity now acts
+   everywhere and only the flap's front edge acts as a floor. The loops now
+   match the photographs.
+2. **Cable length.** The documented 20 cm can't be pin-to-pin, because
+   sockets 28 mm apart would put far pairs (Q–L ≈ 23 cm) out of reach, yet
+   key lists paired any letters. The model uses about 20 cm of cable plus the
+   plug bodies (680 design px ≈ 23 cm). Adjacent pairs hang about 10 cm and
+   the far corners pull almost taut. Recorded as an estimate (RESEARCH §6.3).
+3. **Loose spares lying on the flap** looked like clutter and didn't match
+   the machine as found. Spares now live in the lid, as on the Sotheby's
+   example.
+4. **Used spares did not disappear from the lid.** SVG elements have no
+   `.hidden` property, so the attribute is now toggled directly, with a global
+   `[hidden]` rule.
+5. Test artifact: a smoke script dragged from sockets below the viewport, so
+   the plugboard tests now scroll sockets into view first.
+
+Accepted as realistic: cables crossing sideways cover some socket letters, as
+on the real board. Every socket keeps an accessible label and lights up on
+hover while a plug is being carried.
