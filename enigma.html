@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enigma I</title>
+</head>
+<body>
+<main id="app"></main>
+
+<!--
+  The cipher engine. Pure JavaScript, no DOM access. The test suite extracts
+  this exact <script> block and runs it under Node, so what is tested is what
+  ships. All tables and rules are documented, with sources, in RESEARCH.md.
+-->
+<script id="enigma-engine">
+(function (global) {
+  'use strict';
+
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  class EnigmaError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'EnigmaError';
+    }
+  }
+
+  // RESEARCH.md §1.2–1.3. `turnovers` are the window letters at which the
+  // next rotor is carried; `notches` are the physical notch positions on the
+  // alphabet ring (8 letters further on) and are kept for reference only.
+  const ROTORS = deepFreeze({
+    I:     { wiring: 'EKMFLGDQVZNTOWYHXUSPAIBRCJ', turnovers: 'Q',  notches: 'Y',  introduced: '1930' },
+    II:    { wiring: 'AJDKSIRUXBLHWTMCQGZNPYFVOE', turnovers: 'E',  notches: 'M',  introduced: '1930' },
+    III:   { wiring: 'BDFHJLCPRTXVZNYEIWGAKMUSQO', turnovers: 'V',  notches: 'D',  introduced: '1930' },
+    IV:    { wiring: 'ESOVPZJAYQUIRHXLNFTGKDCMWB', turnovers: 'J',  notches: 'R',  introduced: 'Dec 1938' },
+    V:     { wiring: 'VZBRGITYUPSDNHLXAWMJQOFECK', turnovers: 'Z',  notches: 'H',  introduced: 'Dec 1938' },
+    VI:    { wiring: 'JPGVOUMFYQBENHZRDKASXLICTW', turnovers: 'ZM', notches: 'HU', introduced: '1939' },
+    VII:   { wiring: 'NZJHGRCXMYSWBOUFAIVLPEKQDT', turnovers: 'ZM', notches: 'HU', introduced: '1939' },
+    VIII:  { wiring: 'FKQHTLXOCBJSPDZRAMEWNIUYGV', turnovers: 'ZM', notches: 'HU', introduced: '1939/40' },
+    Beta:  { wiring: 'LEYJVCNIXWPBQMDRTAKZGFUHOS', turnovers: '',   notches: '',   introduced: '1941/42', greek: true },
+    Gamma: { wiring: 'FSOKANUERHMBTIYCWLQPZXVGJD', turnovers: '',   notches: '',   introduced: '1942/43', greek: true },
+  });
+
+  const REFLECTORS = deepFreeze({
+    'A':      { wiring: 'EJMZALYXVBWFCRQUONTSPIKHGD', introduced: 'before 1930 (withdrawn 1937)' },
+    'B':      { wiring: 'YRUHQSLDPXNGOKMIEBFZCWVJAT', introduced: '1937' },
+    'C':      { wiring: 'FVPJIAOYEDRZXWGCTKUQSBNMHL', introduced: '1940/41' },
+    'B-thin': { wiring: 'ENKQAUYWJICOPBLMDXZVFTHRGS', introduced: '1940–42', thin: true },
+    'C-thin': { wiring: 'RDOBJNTKVEHMLFCWZAXGYIPSUQ', introduced: '1940–43', thin: true },
+  });
+
+  // RESEARCH.md §1.7.
+  const MODELS = deepFreeze({
+    'I': {
+      id: 'I', name: 'Enigma I', service: 'Heer & Luftwaffe',
+      rotors: ['I', 'II', 'III', 'IV', 'V'], greek: [], reflectors: ['A', 'B', 'C'],
+      labels: 'numbers',
+      defaults: { reflector: 'B', rotors: ['I', 'II', 'III'] },
+    },
+    'M3': {
+      id: 'M3', name: 'Enigma M3', service: 'Kriegsmarine',
+      rotors: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'], greek: [], reflectors: ['B', 'C'],
+      labels: 'letters',
+      defaults: { reflector: 'B', rotors: ['I', 'II', 'III'] },
+    },
+    'M4': {
+      id: 'M4', name: 'Enigma M4', service: 'Kriegsmarine U-boats',
+      rotors: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'], greek: ['Beta', 'Gamma'], reflectors: ['B-thin', 'C-thin'],
+      labels: 'letters',
+      defaults: { reflector: 'B-thin', rotors: ['Beta', 'I', 'II', 'III'] },
+    },
+  });
+
+  const MAX_PAIRS = 13;
+
+  function deepFreeze(object) {
+    for (const value of Object.values(object)) {
+      if (value && typeof value === 'object') deepFreeze(value);
+    }
+    return Object.freeze(object);
+  }
+
+  const mod26 = (n) => ((n % 26) + 26) % 26;
+  const letter = (i) => ALPHABET[i];
+
+  function toIndex(ch) {
+    const c = String(ch).toUpperCase();
+    if (c.length !== 1 || c < 'A' || c > 'Z') throw new EnigmaError(`"${ch}" is not a letter A–Z`);
+    return c.charCodeAt(0) - 65;
+  }
+
+  // One ring or window value: a letter, or a number 1–26 (Wehrmacht rings
+  // were numbered, RESEARCH.md §1.7).
+  function parseValue(part, what) {
+    if (typeof part === 'number') {
+      if (!Number.isInteger(part) || part < 1 || part > 26) throw new EnigmaError(`${what}: ${part} is not in 1–26`);
+      return part - 1;
+    }
+    const t = String(part).trim().toUpperCase();
+    if (/^[A-Z]$/.test(t)) return t.charCodeAt(0) - 65;
+    if (/^\d{1,2}$/.test(t)) {
+      const n = Number(t);
+      if (n < 1 || n > 26) throw new EnigmaError(`${what}: ${t} is not in 01–26`);
+      return n - 1;
+    }
+    throw new EnigmaError(`${what}: cannot read "${part}"`);
+  }
+
+  // Ring settings or positions for `count` wheels, left to right. Accepts
+  // 'AAV', 'A A V', '01 01 22', [1, 1, 22] or ['A', 'A', 'V'].
+  function parseSettings(value, count, what) {
+    let parts;
+    if (Array.isArray(value)) {
+      parts = value;
+    } else if (typeof value === 'string') {
+      const s = value.trim().toUpperCase();
+      parts = /^[A-Z]+$/.test(s) && s.length === count ? s.split('') : s.split(/[\s,.;:/-]+/).filter(Boolean);
+    } else {
+      throw new EnigmaError(`${what}: expected text or a list`);
+    }
+    if (parts.length !== count) throw new EnigmaError(`${what} needs ${count} values, got ${parts.length}`);
+    return parts.map((p) => parseValue(p, what));
+  }
+
+  // Plug pairs: 'AV BS CG', 'A-V B/S', or the numeric form used on some key
+  // sheets, '1/22 2/19'.
+  function parsePairs(value) {
+    if (value == null) return [];
+    const items = Array.isArray(value)
+      ? value
+      : String(value).trim().toUpperCase().split(/[\s,;]+/).filter(Boolean);
+    const pairs = items.map((item) => {
+      if (Array.isArray(item)) {
+        if (item.length !== 2) throw new EnigmaError(`A plug pair needs two letters`);
+        return [toIndex(item[0]), toIndex(item[1])];
+      }
+      const text = String(item).toUpperCase();
+      let m = /^([A-Z])[-/:]?([A-Z])$/.exec(text);
+      if (m) return [toIndex(m[1]), toIndex(m[2])];
+      m = /^(\d{1,2})[-/:](\d{1,2})$/.exec(text);
+      if (m) return [parseValue(m[1], 'Plug'), parseValue(m[2], 'Plug')];
+      throw new EnigmaError(`Cannot read plug pair "${item}"`);
+    });
+    if (pairs.length > MAX_PAIRS) throw new EnigmaError(`At most ${MAX_PAIRS} plug pairs fit the plugboard`);
+    const used = new Set();
+    for (const [a, b] of pairs) {
+      if (a === b) throw new EnigmaError(`A cable cannot join ${letter(a)} to itself`);
+      for (const x of [a, b]) {
+        if (used.has(x)) throw new EnigmaError(`${letter(x)} is plugged more than once`);
+        used.add(x);
+      }
+    }
+    return pairs;
+  }
+
+  function labelFor(modelId, index) {
+    const model = MODELS[modelId];
+    if (!model) throw new EnigmaError(`Unknown model "${modelId}"`);
+    return model.labels === 'numbers' ? String(index + 1).padStart(2, '0') : letter(index);
+  }
+
+  class Rotor {
+    constructor(name, ring, position) {
+      const spec = ROTORS[name];
+      this.name = name;
+      this.greek = Boolean(spec.greek);
+      this.forwardMap = Array.from(spec.wiring, toIndex);
+      this.backwardMap = new Array(26);
+      this.forwardMap.forEach((out, inp) => { this.backwardMap[out] = inp; });
+      this.turnovers = new Set(Array.from(spec.turnovers, toIndex));
+      this.ring = ring;
+      this.position = position;
+    }
+
+    // The notch is cut into the alphabet ring, so turnover depends only on the
+    // letter showing in the window, never on the ring setting (§1.3).
+    atTurnover() {
+      return this.turnovers.has(this.position);
+    }
+
+    forward(c) {
+      const shift = this.position - this.ring;
+      return mod26(this.forwardMap[mod26(c + shift)] - shift);
+    }
+
+    backward(c) {
+      const shift = this.position - this.ring;
+      return mod26(this.backwardMap[mod26(c + shift)] - shift);
+    }
+  }
+
+  class Machine {
+    constructor(options = {}) {
+      const model = MODELS[options.model || 'I'];
+      if (!model) throw new EnigmaError(`Unknown model "${options.model}"`);
+      this.model = model.id;
+
+      const reflector = options.reflector || model.defaults.reflector;
+      if (!model.reflectors.includes(reflector)) {
+        throw new EnigmaError(`${model.name} has no reflector (UKW) "${reflector}"; choose ${model.reflectors.join(', ')}`);
+      }
+      this.reflector = reflector;
+      this.reflectorMap = Array.from(REFLECTORS[reflector].wiring, toIndex);
+
+      const names = (options.rotors || model.defaults.rotors).map(String);
+      const slots = model.greek.length ? 4 : 3;
+      if (names.length !== slots) throw new EnigmaError(`${model.name} takes ${slots} rotors, got ${names.length}`);
+      names.forEach((name, i) => {
+        const allowed = model.greek.length && i === 0 ? model.greek : model.rotors;
+        if (!allowed.includes(name)) {
+          const where = model.greek.length && i === 0 ? 'Greek wheel' : 'rotor';
+          throw new EnigmaError(`${model.name} cannot use ${where} "${name}" in slot ${i + 1}; choose ${allowed.join(', ')}`);
+        }
+      });
+      if (new Set(names).size !== names.length) throw new EnigmaError(`Each rotor can only be used once`);
+
+      const rings = options.rings == null ? new Array(slots).fill(0) : parseSettings(options.rings, slots, 'Ring setting');
+      const positions = options.positions == null ? new Array(slots).fill(0) : parseSettings(options.positions, slots, 'Rotor position');
+      this.rotors = names.map((name, i) => new Rotor(name, rings[i], positions[i]));
+
+      this.plugMap = Array.from({ length: 26 }, (_, i) => i);
+      this.open = new Set();
+      this.setPlugboard(options.plugboard || []);
+      if (options.open) this.setOpen(options.open);
+    }
+
+    get slots() {
+      return this.rotors.length;
+    }
+
+    // --- plugboard -------------------------------------------------------
+
+    setPlugboard(value) {
+      const pairs = parsePairs(value);
+      for (const [a, b] of pairs) {
+        if (this.open.has(a) || this.open.has(b)) throw new EnigmaError(`A socket holding a loose cable end cannot take a second plug`);
+      }
+      this.plugMap = Array.from({ length: 26 }, (_, i) => i);
+      for (const [a, b] of pairs) {
+        this.plugMap[a] = b;
+        this.plugMap[b] = a;
+      }
+    }
+
+    plug(a, b) {
+      const pairs = this.pairs().map((p) => p.split(''));
+      pairs.push([a, b]);
+      this.setPlugboard(pairs);
+    }
+
+    unplug(x) {
+      const i = toIndex(x);
+      const j = this.plugMap[i];
+      this.plugMap[i] = i;
+      this.plugMap[j] = j;
+      this.open.delete(i);
+    }
+
+    // Sockets holding one end of a cable whose other end is loose. The plug
+    // lifts the socket's shorting bar, so the circuit is open (SPEC §3.3).
+    setOpen(letters) {
+      const set = new Set();
+      for (const ch of Array.isArray(letters) ? letters : String(letters).replace(/[^A-Za-z]/g, '')) {
+        const i = toIndex(ch);
+        if (this.plugMap[i] !== i) throw new EnigmaError(`${letter(i)} is already part of a plug pair`);
+        set.add(i);
+      }
+      this.open = set;
+    }
+
+    pairs() {
+      const out = [];
+      this.plugMap.forEach((j, i) => { if (i < j) out.push(letter(i) + letter(j)); });
+      return out;
+    }
+
+    // --- rotor positions ---------------------------------------------------
+
+    getPositions() {
+      return this.rotors.map((r) => letter(r.position)).join('');
+    }
+
+    setPositions(value) {
+      const positions = parseSettings(value, this.slots, 'Rotor position');
+      this.rotors.forEach((r, i) => { r.position = positions[i]; });
+    }
+
+    getRings() {
+      return this.rotors.map((r) => letter(r.ring)).join('');
+    }
+
+    windowLabels() {
+      return this.rotors.map((r) => labelFor(this.model, r.position));
+    }
+
+    // Turning a rotor by its thumbwheel: no pawl is involved, so nothing is
+    // carried to the neighbouring rotor.
+    rotate(slot, delta = 1) {
+      const rotor = this.rotors[slot];
+      if (!rotor) throw new EnigmaError(`No rotor in slot ${slot}`);
+      rotor.position = mod26(rotor.position + delta);
+      return rotor.position;
+    }
+
+    // --- mechanics -----------------------------------------------------------
+
+    // The three pawls (§1.5). Pawl 1 always pushes the right rotor. Pawl 2
+    // pushes the middle rotor when it can drop into the right rotor's notch.
+    // Pawl 3 drops into the middle rotor's notch and then pushes both the left
+    // rotor and the middle rotor itself: the double step. There is no fourth
+    // pawl, so the M4's Greek wheel never moves.
+    stepFlags() {
+      const n = this.rotors.length;
+      const right = this.rotors[n - 1];
+      const middle = this.rotors[n - 2];
+      const flags = new Array(n).fill(false);
+      flags[n - 1] = true;
+      if (right.atTurnover() || middle.atTurnover()) flags[n - 2] = true;
+      if (middle.atTurnover()) flags[n - 3] = true;
+      return flags;
+    }
+
+    step() {
+      const flags = this.stepFlags();
+      flags.forEach((moves, i) => { if (moves) this.rotors[i].position = mod26(this.rotors[i].position + 1); });
+      return flags;
+    }
+
+    // Current through the machine at the present rotor positions, without
+    // stepping. Returns the lamp index, or null for an open circuit, plus the
+    // letter at every stage so the interface can show the path.
+    trace(input) {
+      let c = input;
+      const path = [{ stage: 'key', letter: letter(c) }];
+      if (this.open.has(c)) return { output: null, path };
+      c = this.plugMap[c];
+      path.push({ stage: 'plugboard', letter: letter(c) });
+      for (let i = this.rotors.length - 1; i >= 0; i--) {
+        c = this.rotors[i].forward(c);
+        path.push({ stage: `rotor ${this.rotors[i].name}`, slot: i, direction: 'in', letter: letter(c) });
+      }
+      c = this.reflectorMap[c];
+      path.push({ stage: `UKW ${this.reflector}`, letter: letter(c) });
+      for (let i = 0; i < this.rotors.length; i++) {
+        c = this.rotors[i].backward(c);
+        path.push({ stage: `rotor ${this.rotors[i].name}`, slot: i, direction: 'out', letter: letter(c) });
+      }
+      if (this.open.has(c)) return { output: null, path };
+      c = this.plugMap[c];
+      path.push({ stage: 'lamp', letter: letter(c) });
+      return { output: c, path };
+    }
+
+    // One key press: the rotors step first, then the circuit closes (§1.1).
+    press(ch) {
+      const input = toIndex(ch);
+      const stepped = this.step();
+      const { output, path } = this.trace(input);
+      return {
+        input: letter(input),
+        output: output == null ? null : letter(output),
+        stepped,
+        positions: this.getPositions(),
+        path,
+      };
+    }
+
+    encrypt(text) {
+      let out = '';
+      for (const ch of String(text)) {
+        if (!/[A-Za-z]/.test(ch)) continue;
+        const { output } = this.press(ch);
+        out += output == null ? '?' : output;
+      }
+      return out;
+    }
+
+    // The substitution alphabet at the current position ('?' = open circuit).
+    permutation() {
+      let out = '';
+      for (let i = 0; i < 26; i++) {
+        const { output } = this.trace(i);
+        out += output == null ? '?' : letter(output);
+      }
+      return out;
+    }
+
+    config() {
+      return {
+        model: this.model,
+        reflector: this.reflector,
+        rotors: this.rotors.map((r) => r.name),
+        rings: this.getRings(),
+        positions: this.getPositions(),
+        plugboard: this.pairs().join(' '),
+        open: Array.from(this.open, letter).sort().join(''),
+      };
+    }
+
+    clone() {
+      return new Machine(this.config());
+    }
+  }
+
+  global.EnigmaEngine = Object.freeze({
+    ALPHABET,
+    ROTORS,
+    REFLECTORS,
+    MODELS,
+    MAX_PAIRS,
+    EnigmaError,
+    Machine,
+    parsePairs: (value) => parsePairs(value).map(([a, b]) => letter(a) + letter(b)),
+    parseSettings: (value, count, what = 'Setting') => parseSettings(value, count, what).map(letter),
+    labelFor,
+    toIndex,
+  });
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+</body>
+</html>
