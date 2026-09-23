@@ -515,6 +515,17 @@ correctly against photographs, not measured from a machine.
    its wiring varied by key list.
 9. The exact wording of the "Zur Beachtung!" plate couldn't be read. The
    simulator shows a plausible **paraphrase**, labelled as decorative.
+10. **Cable length vs socket spacing.** "20 cm" cables and ~28 mm socket
+    pitch don't allow far pairs such as Q–L (≈ 23 cm apart), yet key lists
+    paired arbitrary letters. Either the 20 cm excludes the plugs, or the
+    sockets are closer together. The simulator uses about 23 cm overall
+    (found while building M4).
+11. **Alphabet ring colour** [recollection]: cream rings with black numbers
+    or letters, as seen through the windows. Not confirmed on a photo.
+12. **Direction of roll:** on a step, does the next label enter the window
+    from below or from above? The simulator rolls labels upward (the next one
+    comes from below) and makes an upward drag on the thumbwheel advance it.
+    Not confirmed.
 
 ---
 

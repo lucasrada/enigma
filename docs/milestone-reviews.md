@@ -231,3 +231,45 @@ Fixed after review:
 2. **Ratchet ticks ran into the bottoming clack** (5.5 ms spacing, clack at
    24 ms), so a double step barely stood out. The ticks are now 8 ms apart,
    the clack comes at 34 ms, and the key sounds are 40 % louder.
+
+## M7: Polish
+
+![Final desktop view](screenshots/final/desktop-1440.jpg)
+
+Reviewed at 1920×1080, 1440×900, 1366×768, 1280×720, 1024×1366 (tablet) and
+400 px (phone). Found and fixed:
+
+1. **At 1080 p the plugboard sat below the fold.** On landscape screens the
+   scene now scales so the working band (rotor windows down to the last
+   socket row) fits the window height. The flap and hanging cable loops may
+   continue below. At 1440×900, 1366×768 and 1280×720 every socket row is
+   visible with 30–32 px key caps.
+2. **The lid framing sliced through the "Zur Beachtung!" heading.** The plate
+   sits lower, and the lid fades out just before the frame crops it.
+3. **Phones wasted width** on scene margins and the lid. Below 760 px the
+   margins go and only a sliver of lid shows.
+4. **The masthead wrapped** its sound controls onto a second line at 1280 px,
+   costing ~40 px of machine. The title and controls now share a row, with the
+   tagline below.
+5. **Frame rate.** Moving cables ran at 30 fps (p50 33 ms) in headless
+   Chromium. A CPU profile put JavaScript at ~4 ms a frame, and A/B tests
+   found two culprits:
+   * a full-window `mix-blend-mode` layer for the desk grain, which forced the
+     whole window to be re-blended every frame;
+   * a `mask-image` on the scene.
+   Both were replaced: the grain is an ordinary background under translucent
+   lamp light, and the fade lives on the lid, which is rasterized once.
+   Moving cables now run at **60 fps (p90 16.7 ms)**. Plug shadows are also
+   pre-rendered sprites now instead of twenty blurred canvas draws a frame,
+   and the procedural textures are smaller (start-up ≈ 560 ms, textures
+   230 ms). The one remaining cost, the keys' 3D press transition,
+   occasionally drops software rendering to 30 fps during fast typing. It is
+   cheap under GPU compositing, and it was kept.
+6. **Accessibility:** sockets now announce what they are wired to ("Plugboard
+   socket Q, cable to A"), which the E2E suite checks. The review confirmed
+   the tab order (sound, sheet, archive, thumbwheels, switch, 26 keys, 26
+   sockets, pad) and amber focus rings on keys, wheels and sockets, and that
+   the lamp output is announced through a live region.
+7. **Detail:** slotted screws at the plate corners.
+
+Final state: engine **67/67**, mutants **12/12 killed**, E2E **20/20**.

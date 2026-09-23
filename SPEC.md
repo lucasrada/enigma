@@ -216,3 +216,19 @@ compared against R§4, with the findings and fixes logged in
 | M5 | Models and history | Key sheet, Enigma I/M3/M4 visuals and components, historical presets with auto-typing; E2E historical decrypts; screenshot of each model |
 | M6 | Sound | All events synthesized, mute/volume |
 | M7 | Polish | Textures, lighting, glow, mobile layout, accessibility, performance; final screenshots and review |
+
+All milestones are complete. The review log is in
+[docs/milestone-reviews.md](docs/milestone-reviews.md).
+
+## 7. Deviations from this plan, and why
+
+| Planned | Built | Reason |
+|---|---|---|
+| Default key: the textbook I-II-III, no plugs | The real key of the Barbarossa message, with 10 cables | A realistic working state shows the plugboard in use. The textbook key is one sheet entry away, and the tests cover it |
+| Cable ≈ 20 cm | ≈ 23 cm (20 cm of cable plus the plug bodies) | With sockets 28 mm apart, far pairs would be unreachable, yet key lists paired any letters (review M4; RESEARCH §6.10) |
+| Two spares lying on the flap | Two spares clipped in the lid, dragged out when needed | Matches the Sotheby's machine and keeps the flap clear (review M4) |
+| Up to 13 pairs | Up to 12 in the interface (12 cables supplied); the engine accepts 13 | RESEARCH §1.6 |
+| The machine scaled to the column width | On landscape screens, scaled so the working band (rotors to the last socket row) fits the window height | Rewiring shouldn't mean scrolling away from the lamps (review M7) |
+| A re-plug animates the plug ends through the physics | The whole cable eases into its pre-settled shape, then the physics resumes | Dragging only the ends through the rope tied knots (review M5) |
+| Model changes only on "Einstellen" | Choosing a model swaps in its standard wheels immediately | Clicking M4 and seeing nothing happen reads as broken |
+| — | `window.enigma.renderSounds()` renders sounds offline | Lets the sound design be reviewed as spectrograms and tested (review M6) |
