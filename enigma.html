@@ -102,6 +102,41 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text);
 }
 .masthead h1 span { color: var(--text-dim); font-weight: 500; }
+.masthead .house {
+  order: 3;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-dim);
+  font: 500 14px/1 var(--font-machine);
+  letter-spacing: .06em;
+}
+.sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(233, 223, 203, .28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .25);
+  color: var(--text);
+  font: 500 14px/1 var(--font-machine);
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.sound-toggle::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4a3d2c;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .6);
+}
+.sound-toggle[aria-pressed='true']::before { background: var(--amber); box-shadow: 0 0 8px 1px rgba(255, 181, 46, .7); }
+.sound-toggle b { font-weight: 600; color: var(--text); }
+.volume { display: inline-flex; align-items: center; gap: 8px; }
+.volume input { width: 90px; accent-color: var(--amber); }
 .masthead p {
   margin: 0;
   max-width: 62ch;
@@ -828,6 +863,10 @@ select.typed { min-width: 3.6em; }
 <div class="room">
   <header class="masthead">
     <h1><span>Chiffriermaschine</span> Enigma</h1>
+    <div class="house">
+      <button type="button" class="sound-toggle" id="sound-toggle" aria-pressed="true" title="Synthesized machine sounds">Ton <b>ein</b></button>
+      <label class="volume">Lautstärke <span class="sr-only">(volume)</span><input type="range" id="volume" min="0" max="1" step="0.05" value="0.8"></label>
+    </div>
     <p>Type on your keyboard or click the keys. Drag a thumbwheel to turn a rotor, and drag the cable plugs to rewire the plugboard. The wirings, the double step and the plugboard behave exactly like the real machine.</p>
   </header>
 
@@ -1822,11 +1861,190 @@ select.typed { min-width: 3.6em; }
   }
 
   // ---------------------------------------------------------------------------
-  // Sound hooks (synthesized in the sound section; silent until then)
+  // Sound: every noise is synthesized with Web Audio (no samples). Each
+  // mechanical event is built from filtered noise bursts and damped tones,
+  // sent through a short wooden-case resonance and a compressor.
   // ---------------------------------------------------------------------------
+  const audio = { ctx: null, bus: null, master: null, noise: null, on: true, volume: 0.8 };
+  try {
+    const saved = localStorage.getItem('enigma-sound');
+    if (saved) Object.assign(audio, JSON.parse(saved));
+  } catch { /* storage unavailable: keep the defaults */ }
+
+  let soundOffset = 0;   // seconds added to every event (used when rendering offline)
+  let rendering = false;
+
+  function buildGraph(ctx) {
+      const master = ctx.createGain();
+      master.gain.value = audio.volume;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16;
+      comp.ratio.value = 4;
+      master.connect(comp).connect(ctx.destination);
+      // The machine sits in a wooden box: a very short, dark reverb.
+      const room = ctx.createConvolver();
+      const len = Math.floor(ctx.sampleRate * 0.28);
+      const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      const rnd = mulberry32(88);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = ir.getChannelData(ch);
+        let lp = 0;
+        for (let i = 0; i < len; i++) {
+          lp += ((rnd() * 2 - 1) - lp) * 0.18;
+          data[i] = lp * Math.pow(1 - i / len, 3.2);
+        }
+      }
+      room.buffer = ir;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.22;
+      const bus = ctx.createGain();
+      bus.connect(master);
+      bus.connect(room).connect(wet).connect(master);
+      const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const nd = noise.getChannelData(0);
+      for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+      return { ctx, bus, master, noise };
+  }
+
+  function audioReady() {
+    if (rendering) return true;
+    if (!audio.on) return false;
+    if (!audio.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      Object.assign(audio, buildGraph(new Ctx()));
+    }
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    return audio.ctx.state !== 'closed';
+  }
+
+  // Render a list of [seconds, soundName, argument] through the same graph,
+  // offline. Used to inspect and test the sound design.
+  async function renderSounds(events, seconds = 1.5, sampleRate = 44100) {
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const saved = { ctx: audio.ctx, bus: audio.bus, master: audio.master, noise: audio.noise };
+    const graph = buildGraph(new Offline(1, Math.ceil(sampleRate * seconds), sampleRate));
+    graph.master.gain.value = 0.8;
+    Object.assign(audio, graph);
+    rendering = true;
+    try {
+      for (const [at, name, arg] of events) {
+        soundOffset = at;
+        sound[name](arg);
+      }
+    } finally {
+      rendering = false;
+      soundOffset = 0;
+      Object.assign(audio, saved);
+    }
+    const buffer = await graph.ctx.startRendering();
+    return { sampleRate, samples: Array.from(buffer.getChannelData(0)) };
+  }
+
+  const vary = (v, amount = 0.06) => v * (1 + (Math.random() * 2 - 1) * amount);
+
+  function burst({ at = 0, freq, q = 1, type = 'bandpass', gain, attack = 0.0008, decay }) {
+    const { ctx } = audio;
+    const t = ctx.currentTime + soundOffset + at;
+    const src = ctx.createBufferSource();
+    src.buffer = audio.noise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = vary(freq);
+    filter.Q.value = q;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(vary(gain, 0.15), t + attack);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    src.connect(filter).connect(env).connect(audio.bus);
+    src.start(t, Math.random() * 0.8);
+    src.stop(t + attack + decay + 0.05);
+  }
+
+  function tone({ at = 0, freq, to, type = 'sine', gain, attack = 0.001, decay }) {
+    const { ctx } = audio;
+    const t = ctx.currentTime + soundOffset + at;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(vary(freq, 0.03), t);
+    if (to) osc.frequency.exponentialRampToValueAtTime(to, t + attack + decay);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(vary(gain, 0.15), t + attack);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    osc.connect(env).connect(audio.bus);
+    osc.start(t);
+    osc.stop(t + attack + decay + 0.05);
+  }
+
   const sound = {
-    keyDown() {}, keyUp() {}, detent() {}, plugIn() {}, plugOut() {}, click() {},
+    // The key travels down: the lever starts to move, the pawls throw the
+    // rotors (one sharp ratchet tick per stepping rotor, so a double step
+    // is audible), and the key bottoms out with a clack.
+    keyDown(stepped = [true]) {
+      if (!audioReady()) return;
+      burst({ freq: 700, q: 0.8, type: 'lowpass', gain: 0.25, decay: 0.03 });
+      tone({ freq: 120, to: 80, gain: 0.3, decay: 0.07 });
+      const moving = stepped.map((m, i) => (m ? i : -1)).filter((i) => i >= 0).reverse();
+      moving.forEach((slot, n) => {
+        const at = 0.008 + n * 0.008;
+        burst({ at, freq: 4300 - slot * 350, q: 5, gain: 0.5, decay: 0.006 });
+        tone({ at, freq: 2600 - slot * 240, gain: 0.05, decay: 0.03 });
+      });
+      burst({ at: 0.034, freq: 1900, q: 1.3, gain: 0.7, decay: 0.022 });
+      tone({ at: 0.034, freq: 170, to: 95, gain: 0.38, decay: 0.06 });
+    },
+    // Released, the key springs back and taps its upper stop.
+    keyUp() {
+      if (!audioReady()) return;
+      burst({ freq: 2600, q: 1.6, gain: 0.22, decay: 0.012 });
+      tone({ freq: 4200, gain: 0.025, decay: 0.035 });
+      tone({ at: 0.012, freq: 210, to: 140, gain: 0.11, decay: 0.035 });
+    },
+    // One detent of a thumbwheel.
+    detent() {
+      if (!audioReady()) return;
+      burst({ freq: 4600, q: 2.5, gain: 0.45, decay: 0.005 });
+      tone({ freq: 3300, gain: 0.05, decay: 0.016 });
+      burst({ at: 0.003, freq: 900, q: 1, type: 'lowpass', gain: 0.08, decay: 0.01 });
+    },
+    // A bakelite plug slid into its socket: a short scrape, then the pins
+    // seat with a dull knock and a small metallic ring.
+    plugIn() {
+      if (!audioReady()) return;
+      burst({ freq: 1300, q: 0.9, gain: 0.07, attack: 0.012, decay: 0.05 });
+      burst({ at: 0.045, freq: 800, q: 0.7, type: 'lowpass', gain: 0.4, decay: 0.03 });
+      tone({ at: 0.045, freq: 230, to: 150, gain: 0.2, decay: 0.05 });
+      tone({ at: 0.047, freq: 3900, gain: 0.03, decay: 0.06 });
+      tone({ at: 0.047, freq: 5150, gain: 0.018, decay: 0.045 });
+    },
+    // Pulled out: a quick pop and release.
+    plugOut() {
+      if (!audioReady()) return;
+      burst({ freq: 1600, q: 1.1, gain: 0.26, decay: 0.018 });
+      tone({ freq: 620, to: 300, gain: 0.07, decay: 0.035 });
+    },
+    // The power switch clicking into its next detent.
+    click() {
+      if (!audioReady()) return;
+      burst({ freq: 2300, q: 2, gain: 0.3, decay: 0.012 });
+      tone({ freq: 900, to: 600, gain: 0.08, decay: 0.03 });
+      burst({ at: 0.018, freq: 3200, q: 3, gain: 0.12, decay: 0.006 });
+    },
   };
+
+  function setSound(on, volume = audio.volume) {
+    audio.on = on;
+    audio.volume = volume;
+    if (audio.master) audio.master.gain.value = volume;
+    if (!on && audio.ctx) audio.ctx.suspend();
+    const toggle = document.getElementById('sound-toggle');
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', String(on));
+      toggle.querySelector('b').textContent = on ? 'ein' : 'aus';
+    }
+    try { localStorage.setItem('enigma-sound', JSON.stringify({ on, volume })); } catch { /* ignore */ }
+  }
 
   // ---------------------------------------------------------------------------
   // Animation: one rAF loop that runs only while something moves
@@ -2861,6 +3079,13 @@ select.typed { min-width: 3.6em; }
     });
     window.addEventListener('blur', () => { if (!state.feeding) release(); });
     $('#pad-clear').addEventListener('click', clearPad);
+    $('#sound-toggle').addEventListener('click', () => {
+      setSound(!audio.on);
+      if (audio.on) sound.click();
+    });
+    $('#volume').value = String(audio.volume);
+    $('#volume').addEventListener('input', (e) => setSound(true, Number(e.target.value)));
+    setSound(audio.on, audio.volume);
     $('#pad-copy').addEventListener('click', copyPad);
     $('#feed-go').addEventListener('click', () => feed($('#feed-text').value));
     $('#feed-stop').addEventListener('click', stopPlayback);
@@ -3183,6 +3408,7 @@ select.typed { min-width: 3.6em; }
     setPairs,
     configure,
     play: (id, options) => playMessage(ARCHIVE.find((m) => m.id === id), options),
+    renderSounds,
     stop: stopPlayback,
     cablesSettled,
     get cables() { return cables.map((c) => c.ends.map((e) => e.socket)); },

@@ -198,3 +198,36 @@ Mismatches found and fixed:
    internally now and keeps the newest letters in view.
 4. **Ten plug pairs were cut off** in a one-line field. It is now a two-line
    typed field.
+
+## M6: Sound
+
+![Waveform and spectrogram of the synthesized events](screenshots/m6-sound/spectrogram.png)
+
+All sounds are synthesized with Web Audio from filtered noise bursts and
+damped tones. They pass through a short, dark "wooden case" convolution
+(an impulse generated in code) and a compressor. There are no samples. The
+audio context starts on the first interaction, and the Ton switch and volume
+are remembered in `localStorage`, guarded so the page works without it.
+
+| Event | Built from | What it models |
+|---|---|---|
+| Key down | lever thud, then **one ratchet tick per stepping rotor** (8 ms apart), then the bottoming clack | the pawls throwing the rotors before contact (R§1.1). A double step is audible as extra ticks |
+| Key up | a bright click, a faint spring ring, and a knock on the upper stop | the key springing back |
+| Thumbwheel | a crisp tick per detent | 26 detents a turn |
+| Plug in | a short scrape, then a dull knock plus a small metallic ring | pins sliding in and seating |
+| Plug out | a pop and release | |
+| Power switch | a detent clack | |
+
+Review method: I can't listen in this environment, so every event is
+rendered offline through the same graph (`window.enigma.renderSounds`) and
+checked as a waveform and spectrogram (above). The E2E suite asserts that
+every event is audible and never clips, and that a three-rotor step carries
+at least 1.6× the tick energy of a one-rotor step.
+
+Fixed after review:
+
+1. **The thumbwheel detent was nearly inaudible** (peak 0.012 on its own).
+   The new E2E audibility check caught it. It is now a brighter, fuller tick.
+2. **Ratchet ticks ran into the bottoming clack** (5.5 ms spacing, clack at
+   24 ms), so a double step barely stood out. The ticks are now 8 ms apart,
+   the clack comes at 34 ms, and the key sounds are 40 % louder.

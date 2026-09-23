@@ -322,3 +322,38 @@ for (const id of ['H1', 'H2', 'H5']) {
     await page.close();
   });
 }
+
+// --- Sound (M6) ---------------------------------------------------------------
+
+test('the synthesized sounds are audible, never clip, and a double step ticks more', async () => {
+  const { page } = await open();
+  const render = (events, seconds = 0.4) => page.evaluate(([ev, s]) => window.enigma.renderSounds(ev, s), [events, seconds]);
+  const peak = (xs) => xs.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  for (const name of ['keyDown', 'keyUp', 'detent', 'plugIn', 'plugOut', 'click']) {
+    const { samples } = await render([[0.01, name, [false, false, true]]]);
+    const p = peak(samples);
+    assert.ok(p > 0.02, `${name} is audible (peak ${p.toFixed(3)})`);
+    assert.ok(p < 0.95, `${name} does not clip (peak ${p.toFixed(3)})`);
+  }
+  // Ratchet ticks sit between 5 and 30 ms: one per stepping rotor.
+  const tickEnergy = async (stepped) => {
+    const { samples, sampleRate } = await render([[0, 'keyDown', stepped]], 0.1);
+    let e = 0;
+    let prev = 0;
+    for (let i = Math.floor(0.005 * sampleRate); i < 0.03 * sampleRate; i++) {
+      const hp = samples[i] - prev; // crude high-pass: ticks are bright
+      prev = samples[i];
+      e += hp * hp;
+    }
+    return e;
+  };
+  const one = await tickEnergy([false, false, true]);
+  const three = await tickEnergy([true, true, true]);
+  assert.ok(three > one * 1.6, `a double step (three rotors) is audibly busier: ${three.toFixed(3)} vs ${one.toFixed(3)}`);
+  // The sound toggle persists.
+  await page.click('#sound-toggle');
+  assert.equal(await page.getAttribute('#sound-toggle', 'aria-pressed'), 'false');
+  await page.reload();
+  assert.equal(await page.getAttribute('#sound-toggle', 'aria-pressed'), 'false');
+  await page.close();
+});
