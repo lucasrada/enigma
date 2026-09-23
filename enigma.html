@@ -320,19 +320,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 150px;
-  height: 150px;
-  margin: -75px 0 0 -75px;
+  width: 210px;
+  height: 210px;
+  margin: -105px 0 0 -105px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 196, 90, .55), rgba(255, 170, 50, .18) 38%, rgba(255, 150, 40, 0) 68%);
+  background: radial-gradient(circle, rgba(255, 214, 120, .75), rgba(255, 176, 60, .32) 22%, rgba(255, 150, 40, .1) 45%, rgba(255, 140, 30, 0) 70%);
   opacity: 0;
   pointer-events: none;
   transition: opacity .09s linear;
 }
 .lamp.lit .lamp-glass {
-  background: radial-gradient(circle at 50% 45%, var(--amber-hot), #ffd46a 36%, #ffaa2a 74%, #d9780f);
-  color: #3a2208;
-  box-shadow: inset 0 0 6px rgba(120, 50, 0, .35), 0 0 16px 4px rgba(255, 170, 40, .55);
+  background: radial-gradient(circle at 50% 46%, #fffbe8, var(--amber-hot) 22%, #ffd46a 48%, #ffa928 80%, #d9780f);
+  color: #2a1603;
+  text-shadow: 0 0 1px rgba(90, 40, 0, .6);
+  box-shadow: inset 0 0 6px rgba(120, 50, 0, .35), 0 0 18px 6px rgba(255, 176, 50, .6), 0 0 3px 1px rgba(255, 230, 170, .8);
   transition-duration: .03s;
 }
 .lamp.lit .lamp-bloom { opacity: 1; transition-duration: .03s; }
@@ -715,6 +716,7 @@ select.typed { appearance: none; padding-right: 16px; background-image: linear-g
 .paper-button:hover { background: rgba(255, 255, 255, .45); }
 .paper-button.primary { background: var(--paper-ink); color: var(--paper); }
 .paper-button.primary:hover { background: #453b2e; }
+input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
 .note {
   margin: 10px 0 0;
   min-height: 1.3em;
@@ -866,6 +868,10 @@ select.typed { appearance: none; padding-right: 16px; background-image: linear-g
         <div class="field">
           <label for="feed-text">Eintasten <b>· let the machine type this</b></label>
           <textarea class="typed" id="feed-text" rows="3" spellcheck="false" placeholder="WETTERVORHERSAGE BISKAYA"></textarea>
+        </div>
+        <div class="field">
+          <label for="feed-speed">Tempo <b>· <output id="feed-speed-out" for="feed-speed">8</output> letters a second</b></label>
+          <input type="range" id="feed-speed" min="2" max="30" step="1" value="8">
         </div>
         <div class="row">
           <button class="paper-button primary" type="button" id="feed-go">Eintasten · type it</button>
@@ -1737,31 +1743,384 @@ select.typed { appearance: none; padding-right: 16px; background-image: linear-g
   }
 
   // ---------------------------------------------------------------------------
-  // Start-up
+  // Sound hooks (synthesized in the sound section; silent until then)
+  // ---------------------------------------------------------------------------
+  const sound = {
+    keyDown() {}, keyUp() {}, detent() {}, plugIn() {}, plugOut() {}, click() {},
+  };
+
+  // ---------------------------------------------------------------------------
+  // Animation: one rAF loop that runs only while something moves
+  // ---------------------------------------------------------------------------
+  const tasks = new Set();
+  let looping = false;
+  function animate(task) {
+    tasks.add(task);
+    if (!looping) {
+      looping = true;
+      requestAnimationFrame(frame);
+    }
+  }
+  function frame(now) {
+    for (const task of [...tasks]) if (task(now) === false) tasks.delete(task);
+    if (tasks.size) requestAnimationFrame(frame);
+    else looping = false;
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ---------------------------------------------------------------------------
+  // Controller. The engine is the single source of truth; the view follows.
   // ---------------------------------------------------------------------------
   const state = {
     machine: new E.Machine({ model: 'I' }),
+    down: null,          // letter of the key being held
+    lit: null,           // letter of the lit lamp
+    power: 0,            // index into POWER
+    shown: [],           // displayed rotor values (fractional while rolling)
+    roll: [],            // per-slot roll animations
+    padIn: '',
+    padOut: '',
+    feeding: false,
   };
+  const listeners = new Set();
+  const emit = (type, detail) => listeners.forEach((fn) => fn(type, detail));
 
-  function renderRotors() {
-    const m = state.machine;
-    const labels = Array.from({ length: 26 }, (_, i) => E.labelFor(m.model, i));
-    m.rotors.forEach((rotor, slot) => {
-      drawRing(view.windows[slot], labels, rotor.position);
-      drawWheel(view.wheels[slot].canvas, rotor.position);
+  const POWER = [
+    { id: 'bright', label: 'hell Batterie', angle: -68, lamps: 'bright' },
+    { id: 'dim', label: 'dkl. Batterie', angle: -24, lamps: 'dim' },
+    { id: 'off', label: 'aus', angle: 24, lamps: null },
+    { id: 'external', label: 'Sammler 4V', angle: 68, lamps: null },
+  ];
+  const lampsPowered = () => POWER[state.power].lamps !== null;
+
+  // Rotor windows and wheels ------------------------------------------------
+  function ringLabels() {
+    return Array.from({ length: 26 }, (_, i) => E.labelFor(state.machine.model, i));
+  }
+
+  function drawSlot(slot, value) {
+    const labels = ringLabels();
+    drawRing(view.windows[slot], labels, value);
+    drawWheel(view.wheels[slot].canvas, value);
+  }
+
+  function updateRotorAria() {
+    const labels = ringLabels();
+    state.machine.rotors.forEach((rotor, slot) => {
       const node = view.wheels[slot].node;
+      node.setAttribute('aria-label', `Rotor ${slot + 1} of ${state.machine.slots}, ${rotor.name === 'Beta' ? 'Greek wheel β' : rotor.name === 'Gamma' ? 'Greek wheel γ' : `rotor ${rotor.name}`}`);
+      node.setAttribute('aria-valuemin', '1');
+      node.setAttribute('aria-valuemax', '26');
       node.setAttribute('aria-valuenow', String(rotor.position + 1));
-      node.setAttribute('aria-valuetext', `Rotor ${rotor.name}, position ${labels[rotor.position]}`);
-      node.setAttribute('aria-label', `Rotor ${slot + 1} (${rotor.name}) thumbwheel`);
+      node.setAttribute('aria-valuetext', labels[rotor.position]);
     });
   }
 
+  function rollTask(now) {
+    let busy = false;
+    state.roll.forEach((roll, slot) => {
+      if (!roll) return;
+      const t = clamp((now - roll.t0) / roll.dur, 0, 1);
+      const e = 1 - Math.pow(1 - t, 3);
+      const value = roll.from + (roll.to - roll.from) * e;
+      state.shown[slot] = value;
+      drawSlot(slot, value);
+      if (t < 1) busy = true;
+      else state.roll[slot] = null;
+    });
+    return busy;
+  }
+
+  // Bring the windows to the engine's positions, rolling the short way round.
+  function syncRotors({ immediate = false } = {}) {
+    const now = performance.now();
+    state.machine.rotors.forEach((rotor, slot) => {
+      const shown = state.shown[slot];
+      if (immediate || reducedMotion || shown === undefined) {
+        state.shown[slot] = rotor.position;
+        state.roll[slot] = null;
+        drawSlot(slot, rotor.position);
+        return;
+      }
+      let d = mod(rotor.position - Math.round(shown), 26);
+      if (d > 13) d -= 26;
+      const to = Math.round(shown) + d;
+      if (to === shown) return;
+      state.roll[slot] = { from: shown, to, t0: now, dur: Math.min(240, 70 + 45 * Math.abs(to - shown)) };
+    });
+    updateRotorAria();
+    animate(rollTask);
+  }
+
+  function turn(slot, delta) {
+    if (!state.machine.rotors[slot]) return;
+    state.machine.rotate(slot, delta);
+    syncRotors();
+    sound.detent();
+    emit('rotors');
+  }
+
+  // Lamps -------------------------------------------------------------------
+  let lampTimer = 0;
+  function setLamp(letter) {
+    clearTimeout(lampTimer);
+    if (state.lit) view.lamps.get(state.lit)?.classList.remove('lit');
+    state.lit = null;
+    if (!letter) return;
+    // The lamp circuit closes at the bottom of the key stroke, a moment after
+    // the pawls have moved the rotors.
+    lampTimer = setTimeout(() => {
+      state.lit = letter;
+      view.lamps.get(letter)?.classList.add('lit');
+    }, reducedMotion ? 0 : 28);
+  }
+
+  // Keys --------------------------------------------------------------------
+  function press(letter) {
+    letter = String(letter).toUpperCase();
+    if (!/^[A-Z]$/.test(letter) || state.down === letter) return null;
+    if (state.down) release(state.down);
+    const result = state.machine.press(letter);
+    state.down = letter;
+    view.keys.get(letter)?.classList.add('down');
+    syncRotors();
+    const shown = lampsPowered() ? result.output : null;
+    setLamp(shown);
+    record(letter, shown);
+    sound.keyDown(result.stepped);
+    emit('press', { ...result, shown });
+    return result;
+  }
+
+  function release(letter = state.down) {
+    if (!letter || state.down !== letter) return;
+    view.keys.get(letter)?.classList.remove('down');
+    state.down = null;
+    setLamp(null);
+    sound.keyUp();
+    emit('release', letter);
+  }
+
+  // The message pad -----------------------------------------------------------
+  const groups = (text) => text.replace(/(.{5})/g, '$1 ').trim();
+  const live = $('#live');
+  let hintShown = false;
+
+  function record(input, output) {
+    state.padIn = (state.padIn + input).slice(-2000);
+    state.padOut = (state.padOut + (output ?? '·')).slice(-2000);
+    renderPad();
+    live.textContent = output ? `${input} → ${output}` : `${input}: no lamp`;
+    if (!output && !hintShown) {
+      hintShown = true;
+      const why = !lampsPowered()
+        ? `No lamp: the switch is at “${POWER[state.power].label}”. Turn it to “hell Batterie”.`
+        : 'No lamp: a cable with one loose end has opened the circuit.';
+      padNote(why);
+    }
+  }
+
+  function renderPad() {
+    $('#pad-in').textContent = groups(state.padIn);
+    $('#pad-out').textContent = groups(state.padOut);
+  }
+
+  let noteTimer = 0;
+  function padNote(text, ms = 6000) {
+    const note = $('#pad-note');
+    note.textContent = text;
+    clearTimeout(noteTimer);
+    if (ms) noteTimer = setTimeout(() => { note.textContent = ''; }, ms);
+  }
+
+  function clearPad() {
+    state.padIn = '';
+    state.padOut = '';
+    hintShown = false;
+    renderPad();
+  }
+
+  async function copyPad() {
+    const text = groups(state.padOut);
+    if (!text) return padNote('Nothing to copy yet.');
+    try {
+      await navigator.clipboard.writeText(text);
+      padNote('Copied the lamp output.');
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents($('#pad-out'));
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      padNote('Selected: press Ctrl+C (⌘C) to copy.');
+    }
+  }
+
+  // Let the machine type a text through the real keys and lamps.
+  async function feed(text, { perSecond = Number($('#feed-speed')?.value || 8) } = {}) {
+    const letters = String(text).toUpperCase().replace(/[^A-Z]/g, '');
+    if (!letters) return padNote('Nothing to type: only the letters A–Z go through the machine.');
+    if (state.feeding) return;
+    state.feeding = true;
+    $('#feed-go').hidden = true;
+    $('#feed-stop').hidden = false;
+    emit('feed', { active: true });
+    try {
+      for (const ch of letters) {
+        if (!state.feeding) break;
+        const period = 1000 / clamp(perSecond, 1, 40);
+        press(ch);
+        await sleep(period * 0.6);
+        release(ch);
+        await sleep(period * 0.4);
+      }
+    } finally {
+      state.feeding = false;
+      $('#feed-go').hidden = false;
+      $('#feed-stop').hidden = true;
+      emit('feed', { active: false });
+    }
+  }
+
+  // Power switch ------------------------------------------------------------
+  function setPower(index) {
+    state.power = mod(index, POWER.length);
+    const p = POWER[state.power];
+    const button = $('#power');
+    button.style.setProperty('--knob-angle', `${p.angle}deg`);
+    button.setAttribute('aria-label', `Power switch: ${p.label}${p.lamps ? '' : ' (lamps dark)'}. Click to turn.`);
+    button.title = p.id === 'external' ? 'Sammler 4V: external accumulator (none connected, so the lamps stay dark)' : `Switch: ${p.label}`;
+    $('#machine').dataset.power = p.lamps ?? 'off';
+    if (!p.lamps && state.lit) setLamp(null);
+    hintShown = false;
+  }
+
+  // Wiring the interactions ---------------------------------------------------
+  const isField = (t) => t instanceof Element && t.closest('input, textarea, select, [contenteditable="true"]');
+
+  function bindKeys() {
+    for (const [letter, key] of view.keys) {
+      key.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        key.setPointerCapture(e.pointerId);
+        press(letter);
+      });
+      const up = () => release(letter);
+      key.addEventListener('pointerup', up);
+      key.addEventListener('pointercancel', up);
+      key.addEventListener('lostpointercapture', up);
+      key.addEventListener('keydown', (e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+          e.preventDefault();
+          press(letter);
+        }
+      });
+      key.addEventListener('keyup', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') release(letter);
+      });
+      key.addEventListener('click', (e) => e.preventDefault());
+    }
+  }
+
+  function bindWheels() {
+    view.wheels.forEach(({ node }, slot) => {
+      let startY = 0;
+      let used = 0;
+      let dragging = false;
+      node.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        node.focus({ preventScroll: true });
+        dragging = true;
+        startY = e.clientY;
+        used = 0;
+        node.setPointerCapture(e.pointerId);
+      });
+      node.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dy = e.clientY - startY;
+        const STEP = 11; // screen px per detent
+        while (dy - used <= -STEP) { used -= STEP; turn(slot, +1); }
+        while (dy - used >= STEP) { used += STEP; turn(slot, -1); }
+      });
+      const end = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        if (Math.abs(e.clientY - startY) < 3 && used === 0) {
+          const r = node.getBoundingClientRect();
+          turn(slot, e.clientY < r.top + r.height / 2 ? +1 : -1);
+        }
+      };
+      node.addEventListener('pointerup', end);
+      node.addEventListener('pointercancel', () => { dragging = false; });
+      let wheelAcc = 0;
+      node.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        wheelAcc += e.deltaY;
+        while (wheelAcc <= -30) { wheelAcc += 30; turn(slot, +1); }
+        while (wheelAcc >= 30) { wheelAcc -= 30; turn(slot, -1); }
+      }, { passive: false });
+      node.addEventListener('keydown', (e) => {
+        const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 5, PageDown: -5 }[e.key];
+        if (d) {
+          e.preventDefault();
+          turn(slot, d);
+        }
+      });
+    });
+  }
+
+  function bindGlobal() {
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || isField(e.target)) return;
+      const k = e.key.length === 1 ? e.key.toUpperCase() : '';
+      if (k >= 'A' && k <= 'Z') {
+        e.preventDefault();
+        if (!e.repeat && !state.feeding) press(k);
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      const k = e.key.length === 1 ? e.key.toUpperCase() : '';
+      if (k && k === state.down && !state.feeding) release(k);
+    });
+    window.addEventListener('blur', () => { if (!state.feeding) release(); });
+    $('#power').addEventListener('click', () => {
+      setPower(state.power + 1);
+      sound.click();
+    });
+    $('#pad-clear').addEventListener('click', clearPad);
+    $('#pad-copy').addEventListener('click', copyPad);
+    $('#feed-go').addEventListener('click', () => feed($('#feed-text').value));
+    $('#feed-stop').addEventListener('click', () => { state.feeding = false; });
+    $('#feed-speed').addEventListener('input', (e) => { $('#feed-speed-out').value = e.target.value; });
+  }
+
+  // A small scripting surface, handy from the console and used by the tests.
+  window.enigma = Object.freeze({
+    get machine() { return state.machine; },
+    get state() { return { down: state.down, lit: state.lit, power: POWER[state.power].id, padIn: state.padIn, padOut: state.padOut, feeding: state.feeding }; },
+    press,
+    release,
+    type: feed,
+    turn,
+    setPower: (id) => setPower(POWER.findIndex((p) => p.id === id)),
+    on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Start-up
+  // ---------------------------------------------------------------------------
   makeTextures();
   buildPlate(state.machine.model);
   buildPlugboard();
   layoutScene();
-  renderRotors();
-  document.fonts?.ready.then(renderRotors);
+  bindKeys();
+  bindWheels();
+  bindGlobal();
+  setPower(0);
+  syncRotors({ immediate: true });
+  document.fonts?.ready.then(() => syncRotors({ immediate: true }));
 })();
 </script>
 </body>

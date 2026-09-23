@@ -78,3 +78,30 @@ Mismatches found in the screenshots, and the fixes:
 7. The machine sat below the fold on a 1440 × 900 desktop. The lid is cropped
    tighter and the side papers are narrower, so rotors, lamps, keys and
    plugboard all show without scrolling.
+
+## M3: Live machine
+
+![Typing, with the E key held](screenshots/m3-live/desktop-1440.jpg)
+
+* **Behaviour vs research:** the rotors step on key-down, **before** the lamp
+  circuit closes (§1.1). The lamp lights about 28 ms later, at the bottom of
+  the stroke, and **only while the key is held**. Holding a physical key does
+  not auto-repeat, just as on the machine. The thumbwheels turn one rotor
+  with **no carry** (§1.5). The power switch has four positions (§4.2):
+  `dkl.` dims the lamps, while `aus` and `Sammler 4V` (no accumulator
+  connected) leave them dark even though the rotors still step. The pad then
+  explains why nothing lit.
+* **Windows:** after typing 24 letters from `01 01 01`, the windows read
+  `01 02 25`. The middle rotor was carried once, when III passed its turnover
+  V, as the stepping rule requires.
+* **E2E** (`npm run test:e2e`), **7/7 pass:** no errors and no network
+  requests; physical-keyboard typing equals the engine, including
+  `AAAAA → BDZGO`; a lamp lit only while held; mouse presses; thumbwheels by
+  drag, arrow keys and scroll wheel with no carry, and numbered labels;
+  power-switch behaviour; auto-typing through the keys.
+* **Fixed after review:** the lit lamp read as a flat orange disc with a pale
+  letter. A lamp behind celluloid glows white-hot at the centre with the
+  letter in dark silhouette, and throws a wide halo on the paint. The glass
+  gradient, the letter colour and the bloom were redone to match.
+* Left for M5: the key-sheet fields are still empty, one sheet button label
+  wraps, and the pad subtitle runs under the "FUNK" stamp.
