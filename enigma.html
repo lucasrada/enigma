@@ -47,27 +47,20 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { background: var(--desk); }
+/* A walnut desk under a warm lamp: translucent light and shade over the
+   grain. No blend modes, which would re-blend the whole window every frame. */
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
   background:
     radial-gradient(ellipse 70% 55% at 50% 22%, rgba(255, 190, 110, .20), rgba(255, 190, 110, 0) 70%),
-    radial-gradient(ellipse 120% 90% at 50% 30%, var(--desk-lit), var(--desk) 62%, #0b0907 100%),
+    radial-gradient(ellipse 120% 90% at 50% 30%, rgba(58, 42, 27, .5), rgba(21, 17, 13, .68) 62%, rgba(8, 6, 5, .92) 100%),
+    var(--tex-desk, none) 50% 0 / 1200px auto,
     var(--desk);
   font: 400 16px/1.45 var(--font-machine);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-}
-body::before { /* the desk top's own grain, laid over the lamp light */
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: var(--tex-desk, none);
-  background-size: 1200px auto;
-  opacity: .35;
-  mix-blend-mode: soft-light;
-  pointer-events: none;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
@@ -87,11 +80,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding-block: 20px 48px;
 }
 .masthead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 24px;
-  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 24px;
+  margin-bottom: 16px;
 }
 .masthead h1 {
   margin: 0;
@@ -103,8 +96,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .masthead h1 span { color: var(--text-dim); font-weight: 500; }
 .masthead .house {
-  order: 3;
-  margin-left: auto;
+  grid-row: 1;
+  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -138,11 +131,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .volume { display: inline-flex; align-items: center; gap: 8px; }
 .volume input { width: 90px; accent-color: var(--amber); }
 .masthead p {
+  grid-column: 1 / -1;
   margin: 0;
-  max-width: 62ch;
+  max-width: 96ch;
   color: var(--text-dim);
   font-size: 15px;
   text-wrap: pretty;
+}
+@media (max-width: 560px) {
+  .masthead { grid-template-columns: minmax(0, 1fr); }
+  .masthead .house { grid-row: auto; grid-column: 1; }
 }
 .desk {
   display: grid;
@@ -221,6 +219,25 @@ button, input, select, textarea { font: inherit; color: inherit; }
     linear-gradient(rgba(86, 88, 86, .32), rgba(86, 88, 86, .32)),
     var(--tex-crackle, none);
   background-size: auto, auto, 180px 180px;
+}
+.screw {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  margin: -7.5px 0 0 -7.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #8d8880, #3b3833 70%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .8), inset 0 0 0 1px rgba(0, 0, 0, .5);
+}
+.screw::after { /* the slot */
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 6.5px;
+  height: 2px;
+  background: #1a1815;
+  transform: rotate(var(--slot, 30deg));
 }
 .cover-lock {
   position: absolute;
@@ -480,6 +497,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   height: 840px;
   transform-origin: 50% 100%;
   transform: rotateX(-80deg);
+  /* fade out where the framing crops the lid (stops set by layoutScene) */
+  -webkit-mask-image: linear-gradient(to top, #000 var(--lid-fade-a, 30%), transparent var(--lid-fade-b, 40%));
+  mask-image: linear-gradient(to top, #000 var(--lid-fade-a, 30%), transparent var(--lid-fade-b, 40%));
   border-radius: 12px;
   background-image: var(--tex-oak, none), linear-gradient(#9d6a38, #7c5029);
   background-size: 1011px auto, auto;
@@ -499,10 +519,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .instructions {
   position: absolute;
   left: 50%;
-  bottom: 80px;
+  bottom: 46px;
   width: 500px;
   margin-left: -250px;
-  padding: 22px 30px 20px;
+  padding: 18px 30px 16px;
   border-radius: 6px;
   background: linear-gradient(170deg, #f1eadb, #ddd3bd);
   color: #1f1b16;
@@ -684,11 +704,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .cables {
   position: absolute;
-  left: 0;
-  top: -90px;
   width: 1011px;
   height: 660px;
   pointer-events: none;
+  z-index: 2;
 }
 .front, .flap { touch-action: none; }
 .socket.pending .socket-plate { box-shadow: 0 0 0 3px var(--amber), 0 0 14px 3px rgba(255, 181, 46, .45); }
@@ -956,8 +975,9 @@ select.typed { min-width: 3.6em; }
               <span class="hinge" style="right:150px"></span>
             </div>
             <div class="flap" aria-hidden="true"><span class="flap-stamp">Klappe schließen!</span></div>
-            <canvas class="cables" id="cables"></canvas>
           </div>
+          <!-- Outside the 3D context: redrawing it doesn't recomposite the scene. -->
+          <canvas class="cables" id="cables"></canvas>
         </div>
       </div>
     </section>
@@ -1460,7 +1480,7 @@ select.typed { min-width: 3.6em; }
     P: 2400,
     Hc: 2160,
     lidLean: 10,              // degrees past vertical
-    lidVisible: 250,          // how much of the open lid the scene shows
+    lidVisible: 262,          // how much of the open lid the scene shows
   };
   const ROWS = ['QWERTZUIO', 'ASDFGHJK', 'PYXCVBNML'];
   const rowX = (row, i) => G.plateW / 2 + (i - (ROWS[row].length - 1) / 2) * G.pitch;
@@ -1607,12 +1627,12 @@ select.typed { min-width: 3.6em; }
     const url = (canvas, type = 'image/png', q) => `url(${canvas.toDataURL(type, q)})`;
     const OAK = [[88, 52, 24], [138, 88, 44], [176, 120, 64], [205, 150, 88], [226, 178, 116]];
     const WALNUT = [[14, 10, 7], [30, 20, 13], [46, 31, 20], [62, 42, 27], [78, 54, 34]];
-    root.setProperty('--tex-oak', url(oakTexture(1024, 420, 1939, OAK), 'image/jpeg', 0.86));
-    root.setProperty('--tex-oak-end', url(oakTexture(700, 300, 1941, OAK), 'image/jpeg', 0.86));
-    root.setProperty('--tex-desk', url(oakTexture(1024, 512, 1945, WALNUT), 'image/jpeg', 0.8));
+    root.setProperty('--tex-oak', url(oakTexture(900, 360, 1939, OAK), 'image/jpeg', 0.86));
+    root.setProperty('--tex-oak-end', url(oakTexture(520, 220, 1941, OAK), 'image/jpeg', 0.86));
+    root.setProperty('--tex-desk', url(oakTexture(640, 320, 1945, WALNUT), 'image/jpeg', 0.8));
     root.setProperty('--tex-crackle', url(crackleTexture(180, 1930, [22, 21, 19])));
     root.setProperty('--tex-ebonite', url(ebonTexture(256, 1936)));
-    root.setProperty('--tex-paper', url(paperTexture(420, 1942), 'image/jpeg', 0.88));
+    root.setProperty('--tex-paper', url(paperTexture(360, 1942), 'image/jpeg', 0.88));
   }
 
   // ---------------------------------------------------------------------------
@@ -1758,6 +1778,9 @@ select.typed { min-width: 3.6em; }
       view.wheels.push({ node: wheel, canvas: knurl });
     });
     for (const x of [72, G.plateW - 72]) plate.append(place(el('span', { class: 'nut' }), x, 226));
+    [[16, 16, 20], [G.plateW - 16, 16, 75], [16, 500, -40], [G.plateW - 16, 500, 10]].forEach(([x, y, a]) => {
+      plate.append(place(el('span', { class: 'screw', style: { '--slot': `${a}deg` } }), x, y));
+    });
     // The M4's rotor cover could be locked (RESEARCH.md §4.7).
     if (slots === 4) plate.append(place(el('span', { class: 'cover-lock', 'aria-hidden': 'true' }), 230, G.rotorY));
 
@@ -1835,29 +1858,57 @@ select.typed { min-width: 3.6em; }
     return eye + (y - eye) * (G.P / (G.P - z));
   }
 
+  // Frame the machine for the viewport. Narrow screens show only a sliver of
+  // the lid and no side margin. Landscape screens scale the working band,
+  // from the rotor windows down to the last row of sockets, to fit the
+  // window height, so rewiring never means scrolling away from the lamps;
+  // the flap and hanging cable loops may continue below the fold.
+  let sceneScale = 1;
   function layoutScene() {
     const machine = $('#machine');
+    const scene = $('#scene');
+    const wrap = $('#scene-wrap');
     const topBack = project(0, -G.caseD);
     const lean = (G.lidLean * Math.PI) / 180;
     const lidTop = project(-G.caseD * Math.cos(lean), -G.caseD - G.caseD * Math.sin(lean));
-    const shownTop = Math.max(lidTop, topBack - G.lidVisible);
-    const hinge = Math.round(-shownTop) + 10;
-    const height = hinge + G.frontH + G.flapH + 20;
-    machine.style.top = `${hinge}px`;
-    machine.style.height = `${G.frontH + G.flapH}px`;
     machine.style.perspective = `${G.P}px`;
     machine.style.perspectiveOrigin = `${G.caseW / 2}px ${-G.Hc}px`;
-    const scene = $('#scene');
-    scene.style.height = `${height}px`;
-    const wrap = $('#scene-wrap');
     const fit = () => {
-      const scale = Math.min(1.25, wrap.clientWidth / 1100);
-      scene.style.transform = `scale(${scale})`;
+      const narrow = innerWidth < 760;
+      const sceneW = narrow ? G.caseW + 24 : 1100;
+      const lidShown = narrow ? 70 : G.lidVisible;
+      const shownTop = Math.max(lidTop, topBack - lidShown);
+      // The lid's projected height is (topBack - lidTop); fade its top out
+      // just before the scene edge crops it.
+      const frac = clamp(lidShown / (topBack - lidTop), 0, 1);
+      const lidEl = $('#lid');
+      lidEl.style.setProperty('--lid-fade-a', `${Math.max(0, frac * 100 - 9).toFixed(1)}%`);
+      lidEl.style.setProperty('--lid-fade-b', `${Math.max(1, frac * 100 - 1).toFixed(1)}%`);
+      const hinge = Math.round(-shownTop) + 10;
+      const height = hinge + G.frontH + G.flapH + 20;
+      machine.style.top = `${hinge}px`;
+      machine.style.left = `${(sceneW - G.caseW) / 2}px`;
+      const cablesCanvas = $('#cables');
+      cablesCanvas.style.left = machine.style.left;
+      cablesCanvas.style.top = `${hinge + CAN.top}px`;
+      machine.style.height = `${G.frontH + G.flapH}px`;
+      scene.style.width = `${sceneW}px`;
+      scene.style.height = `${height}px`;
+      let scale = Math.min(1.25, wrap.clientWidth / sceneW);
+      if (innerWidth >= 1000 && innerWidth > innerHeight) {
+        const top = wrap.getBoundingClientRect().top + scrollY;
+        const working = hinge + 300 + 16; // down to the plugboard's bottom edge
+        scale = Math.min(scale, Math.max(0.45, (innerHeight - Math.min(top, 140) - 12) / working));
+      }
+      sceneScale = scale;
+      const offset = Math.max(0, (wrap.clientWidth - sceneW * scale) / 2);
+      scene.style.transform = `translateX(${offset}px) scale(${scale})`;
       wrap.style.height = `${Math.ceil(height * scale)}px`;
       sizeCables(scale);
     };
     fit();
     new ResizeObserver(fit).observe(wrap);
+    addEventListener('resize', fit);
   }
 
   // ---------------------------------------------------------------------------
@@ -2489,7 +2540,7 @@ select.typed { min-width: 3.6em; }
 
   // A plug seen from the front while seated: the rear of a black bakelite
   // body, the cable leaving from its lower half.
-  function drawSeatedPlug(ctx, x, y, lifted) {
+  function paintSeatedPlug(ctx, x, y, lifted) {
     const w = PLUG.w * (lifted ? 1.08 : 1);
     const h = PLUG.h * (lifted ? 1.08 : 1);
     ctx.save();
@@ -2531,20 +2582,13 @@ select.typed { min-width: 3.6em; }
     ctx.restore();
   }
 
-  // A loose plug lying or dangling: seen from the side, pins showing.
-  function drawLoosePlug(ctx, c, k, lifted) {
-    const i = endIndex(k);
-    const j = k === 0 ? 1 : ROPE.n - 1;
-    const angle = Math.atan2(c.y[i] - c.y[j], c.x[i] - c.x[j]);
+  // A loose plug lying or dangling: seen from the side, pins showing. Drawn
+  // at the origin pointing along +x; its shadow is drawn separately so the
+  // light stays fixed while the plug turns.
+  function paintLoosePlug(ctx, lifted) {
     const len = 50 * (lifted ? 1.08 : 1);
     const thick = 30 * (lifted ? 1.08 : 1);
     ctx.save();
-    ctx.translate(c.x[i], c.y[i]);
-    ctx.rotate(angle);
-    ctx.shadowColor = 'rgba(0,0,0,.55)';
-    ctx.shadowBlur = lifted ? 16 : 6;
-    ctx.shadowOffsetX = lifted ? 7 : 3;
-    ctx.shadowOffsetY = lifted ? 12 : 4;
     const body = ctx.createLinearGradient(0, -thick / 2, 0, thick / 2);
     body.addColorStop(0, '#46413c');
     body.addColorStop(0.4, '#1b1816');
@@ -2552,7 +2596,6 @@ select.typed { min-width: 3.6em; }
     ctx.fillStyle = body;
     roundRect(ctx, -8, -thick / 2, len, thick, 9);
     ctx.fill();
-    ctx.shadowColor = 'transparent';
     // two pins at the front: thick (4 mm) above, thin (3 mm) below
     const pin = ctx.createLinearGradient(0, -6, 0, 6);
     pin.addColorStop(0, '#f4ecd3');
@@ -2565,6 +2608,52 @@ select.typed { min-width: 3.6em; }
     ctx.lineWidth = 1;
     roundRect(ctx, -8, -thick / 2, len, thick, 9);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // Plugs are pre-rendered once per scale: canvas shadows are costly to blur
+  // twenty times a frame.
+  const sprites = new Map();
+  function sprite(key, w, h, ox, oy, paintFn) {
+    const scale = cv.spriteScale || 1;
+    let s = sprites.get(key);
+    if (s && s.scale === scale) return s;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(w * scale);
+    canvas.height = Math.ceil(h * scale);
+    const g = canvas.getContext('2d');
+    g.scale(scale, scale);
+    g.translate(ox, oy);
+    paintFn(g);
+    s = { canvas, w, h, ox, oy, scale };
+    sprites.set(key, s);
+    return s;
+  }
+
+  function drawSeatedPlug(ctx, x, y, lifted) {
+    const s = sprite(lifted ? 'seat-lifted' : 'seat', 104, 124, 42, 46, (g) => paintSeatedPlug(g, 0, 0, lifted));
+    ctx.drawImage(s.canvas, x - s.ox, y - s.oy, s.w, s.h);
+  }
+
+  function drawLoosePlug(ctx, c, k, lifted) {
+    const i = endIndex(k);
+    const j = k === 0 ? 1 : ROPE.n - 1;
+    const angle = Math.atan2(c.y[i] - c.y[j], c.x[i] - c.x[j]);
+    const shadow = sprite(lifted ? 'loose-shadow-lifted' : 'loose-shadow', 90, 90, 45, 45, (g) => {
+      const r = g.createRadialGradient(0, 0, 2, 0, 0, lifted ? 40 : 30);
+      r.addColorStop(0, 'rgba(0,0,0,.5)');
+      r.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = r;
+      g.fillRect(-45, -45, 90, 90);
+    });
+    const dx = lifted ? 10 : 4;
+    const dy = lifted ? 16 : 6;
+    ctx.drawImage(shadow.canvas, c.x[i] + dx + Math.cos(angle) * 18 - shadow.ox, c.y[i] + dy + Math.sin(angle) * 18 - shadow.oy, shadow.w, shadow.h);
+    const s = sprite(lifted ? 'loose-lifted' : 'loose', 80, 44, 12, 22, (g) => paintLoosePlug(g, lifted));
+    ctx.save();
+    ctx.translate(c.x[i], c.y[i]);
+    ctx.rotate(angle);
+    ctx.drawImage(s.canvas, -s.ox, -s.oy, s.w, s.h);
     ctx.restore();
   }
 
@@ -2689,6 +2778,13 @@ select.typed { min-width: 3.6em; }
     m.setOpen('');
     m.setPlugboard(pairs);
     m.setOpen(open);
+    // Tell assistive technology what each socket is wired to.
+    const partner = new Map();
+    for (const [a, b] of pairs) { partner.set(a, b); partner.set(b, a); }
+    for (const [letter, s] of view.sockets) {
+      const state_ = partner.has(letter) ? `, cable to ${partner.get(letter)}` : open.includes(letter) ? ', cable with a loose end' : ', empty';
+      s.node.setAttribute('aria-label', `Plugboard socket ${letter}${state_}`);
+    }
     emit('plugboard', { pairs, open });
   }
 
@@ -2982,6 +3078,7 @@ select.typed { min-width: 3.6em; }
   function sizeCables(scale) {
     if (!cv.canvas) return;
     const d = Math.min(3, (window.devicePixelRatio || 1) * scale);
+    cv.spriteScale = d;
     cv.canvas.width = Math.round(CAN.w * d);
     cv.canvas.height = Math.round(CAN.h * d);
     cv.ctx.setTransform(d, 0, 0, d, 0, 0);
@@ -3419,7 +3516,9 @@ select.typed { min-width: 3.6em; }
   // ---------------------------------------------------------------------------
   // Start-up
   // ---------------------------------------------------------------------------
+  performance.mark('enigma:start');
   makeTextures();
+  performance.measure('enigma:textures', 'enigma:start');
   buildPlate(state.machine.model);
   buildPlugboard();
   layoutScene();
@@ -3431,6 +3530,7 @@ select.typed { min-width: 3.6em; }
   buildArchive();
   renderSheet();
   syncRotors({ immediate: true });
+  performance.measure('enigma:ready', 'enigma:start');
   document.fonts?.ready.then(() => syncRotors({ immediate: true }));
 })();
 </script>

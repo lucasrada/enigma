@@ -185,6 +185,8 @@ test('dragging a plug to another socket rewires the plugboard', async () => {
   await drag(page, await socketPoint(page, 'V'), await socketPoint(page, 'Q'));
   await page.waitForTimeout(100);
   assert.equal(await pairsOf(page), 'AQ BS CG DL FU HZ IN KM OW RX');
+  assert.equal(await page.getAttribute('.socket[data-letter="Q"]', 'aria-label'), 'Plugboard socket Q, cable to A');
+  assert.equal(await page.getAttribute('.socket[data-letter="V"]', 'aria-label'), 'Plugboard socket V, empty');
   // Typing now follows the new wiring.
   const start = await page.evaluate(() => window.enigma.machine.config());
   await typeKeys(page, 'QUAKE');
