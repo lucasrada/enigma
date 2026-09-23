@@ -1,0 +1,20 @@
+{
+  "name": "enigma",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A historically exact, skeuomorphic Enigma I / M3 / M4 simulator in one self-contained HTML file.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/engine.test.mjs tests/properties.test.mjs",
+    "test:mutants": "node tools/mutants.mjs",
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e.test.mjs",
+    "test:all": "npm test && npm run test:mutants && npm run test:e2e",
+    "screenshots": "node tools/screenshot.mjs"
+  },
+  "devDependencies": {
+    "playwright": "~1.56.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
