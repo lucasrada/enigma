@@ -1863,7 +1863,6 @@ select.typed { min-width: 3.6em; }
   // from the rotor windows down to the last row of sockets, to fit the
   // window height, so rewiring never means scrolling away from the lamps;
   // the flap and hanging cable loops may continue below the fold.
-  let sceneScale = 1;
   function layoutScene() {
     const machine = $('#machine');
     const scene = $('#scene');
@@ -1900,7 +1899,6 @@ select.typed { min-width: 3.6em; }
         const working = hinge + 300 + 16; // down to the plugboard's bottom edge
         scale = Math.min(scale, Math.max(0.45, (innerHeight - Math.min(top, 140) - 12) / working));
       }
-      sceneScale = scale;
       const offset = Math.max(0, (wrap.clientWidth - sceneW * scale) / 2);
       scene.style.transform = `translateX(${offset}px) scale(${scale})`;
       wrap.style.height = `${Math.ceil(height * scale)}px`;
@@ -2782,8 +2780,8 @@ select.typed { min-width: 3.6em; }
     const partner = new Map();
     for (const [a, b] of pairs) { partner.set(a, b); partner.set(b, a); }
     for (const [letter, s] of view.sockets) {
-      const state_ = partner.has(letter) ? `, cable to ${partner.get(letter)}` : open.includes(letter) ? ', cable with a loose end' : ', empty';
-      s.node.setAttribute('aria-label', `Plugboard socket ${letter}${state_}`);
+      const wiring = partner.has(letter) ? `, cable to ${partner.get(letter)}` : open.includes(letter) ? ', cable with a loose end' : ', empty';
+      s.node.setAttribute('aria-label', `Plugboard socket ${letter}${wiring}`);
     }
     emit('plugboard', { pairs, open });
   }
