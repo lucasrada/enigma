@@ -154,3 +154,47 @@ Mismatches found and fixed:
 Accepted as realistic: cables crossing sideways cover some socket letters, as
 on the real board. Every socket keeps an accessible label and lights up on
 hover while a plug is being carried.
+
+## M5: Models, key sheet and historical messages
+
+![Barbarossa message deciphered](screenshots/m5-models/desktop-1440.jpg)
+![M4 with the U-264 key](screenshots/m5-models/m4/machine.jpg)
+
+* **Key sheet (Maschinenschlüssel):** model, UKW, Walzenlage, Ringstellung,
+  Grundstellung and Steckerverbindungen. It offers only each model's own
+  components (R§1.7) and validates through the engine, so "Each rotor can
+  only be used once" and "A is plugged more than once" appear as readable
+  notes. Applying a key swaps the wheels, rolls the windows, and re-plugs the
+  cables with animation, returning unused cables to the lid. The start
+  positions and plug pairs on the sheet follow the machine live.
+* **Models:** Enigma I has numbered windows and black crackle paint. M3 has
+  lettered windows and the Navy rotor set. M4 has four lettered windows (the
+  Greek wheel leftmost), a **lockable rotor cover** and grey-black paint (R§4.7).
+  Choosing a model swaps in its standard wheels at once and leaves the cables
+  in place.
+* **Historical messages:** 1930 manual, Barbarossa ×2, U-264, Scharnhorst
+  and Dönitz. Loading one sets the key, performs the **indicator procedure**
+  on the machine (1930: the doubled key `PKPJXI → ABLABL`; 1941: `WXC KCH →
+  BLA`), turns the thumbwheels one detent at a time, and types the message
+  through the keys and lamps. It then shows a reading with word breaks, an
+  English translation and the source. Navy messages start from the recovered
+  message key, with a note that their indicators used bigram tables (R§1.8).
+* **E2E: 19/19 pass.** The new tests cover model switching (window count,
+  numbers or letters, M4 lock, default wheels), the sheet setting a key and
+  following the rotors, refusals of impossible keys, and **H1, H2 and H5
+  deciphered through the UI**, matching the published plaintext exactly
+  (U-264 ends on `VJWY`).
+
+Mismatches found and fixed:
+
+1. **Cables tied themselves in knots after re-plugging.** Dragging only the
+   plug ends through the simulation bunched the rope, and floor friction froze
+   the bunches into curls. A re-plug now eases the whole cable into its
+   pre-settled hanging shape (the same physics, run on a scratch rope), then
+   hands back to the simulation for a small settling swing.
+2. **The "GEHEIM" stamp covered the hint text.** The hint moved to the
+   Funksprüche card, where it belongs.
+3. **Long messages stretched the pad down the page.** The pad scrolls
+   internally now and keeps the newest letters in view.
+4. **Ten plug pairs were cut off** in a one-line field. It is now a two-line
+   typed field.

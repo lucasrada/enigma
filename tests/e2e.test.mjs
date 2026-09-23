@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { HTML_PATH, loadEngine } from './load-engine.mjs';
+import { HISTORICAL } from './vectors.mjs';
 
 const E = loadEngine();
 let browser;
@@ -246,3 +247,78 @@ test('a spare cable can be dragged out of the lid into a socket', async () => {
   assert.equal(await page.locator('.spare:not([hidden])').count(), 1);
   await page.close();
 });
+
+// --- Key sheet, models and historical messages (M5) -------------------------
+
+const windowLabels = (page) => page.evaluate(() => [...document.querySelectorAll('.wheel-slot')].map((n) => n.getAttribute('aria-valuetext')));
+
+test('choosing a model changes the rotor windows: numbers on Enigma I, letters on M3, four on M4', async () => {
+  const { page } = await open();
+  assert.deepEqual(await windowLabels(page), ['02', '12', '01']);
+  await page.check('#model-M3');
+  await page.waitForFunction(() => window.enigma.machine.model === 'M3');
+  assert.equal(await page.locator('.rotor-window').count(), 3);
+  assert.deepEqual(await windowLabels(page), ['A', 'A', 'A']);
+  assert.equal(await pairsOf(page), 'AV BS CG DL FU HZ IN KM OW RX', 'the cables stay plugged');
+  await page.check('#model-M4');
+  await page.waitForFunction(() => window.enigma.machine.model === 'M4');
+  assert.equal(await page.locator('.rotor-window').count(), 4);
+  assert.equal(await page.locator('.cover-lock').count(), 1, 'the M4 rotor cover has a lock');
+  assert.deepEqual(await page.evaluate(() => window.enigma.machine.config().rotors), ['Beta', 'I', 'II', 'III']);
+  assert.equal(await page.inputValue('#ukw'), 'B-thin');
+  await page.check('#model-I');
+  await page.waitForFunction(() => window.enigma.machine.model === 'I');
+  assert.deepEqual(await windowLabels(page), ['01', '01', '01']);
+  await page.close();
+});
+
+test('the key sheet sets the machine, and follows the rotors as they move', async () => {
+  const { page } = await open();
+  await page.selectOption('#ukw', 'C');
+  await page.selectOption('#rotor-0', 'V');
+  await page.selectOption('#rotor-1', 'I');
+  await page.selectOption('#rotor-2', 'III');
+  for (const [i, v] of ['16', '11', '13'].entries()) await page.fill(`#ring-${i}`, v);
+  for (const [i, v] of ['01', '26', '22'].entries()) await page.fill(`#start-${i}`, v);
+  await page.fill('#stecker', 'co di fr hu jw ls tx');
+  await page.click('#key-form button[type="submit"]');
+  await page.evaluate(() => window.enigma.cablesSettled());
+  const config = await page.evaluate(() => window.enigma.machine.config());
+  assert.deepEqual(
+    { reflector: config.reflector, rotors: config.rotors, rings: config.rings, positions: config.positions, plugboard: config.plugboard },
+    { reflector: 'C', rotors: ['V', 'I', 'III'], rings: 'PKM', positions: 'AZV', plugboard: 'CO DI FR HU JW LS TX' },
+  );
+  assert.equal(await page.locator('.spare:not([hidden])').count(), 2, 'unused cables went back to the lid');
+  const reference = new E.Machine(config);
+  await typeKeys(page, 'FUNKSPRUCH');
+  assert.equal((await uiState(page)).padOut, reference.encrypt('FUNKSPRUCH'));
+  assert.equal(await page.inputValue('#start-2'), E.labelFor('I', E.ALPHABET.indexOf(reference.getPositions()[2])), 'Grundstellung follows the windows');
+  await page.close();
+});
+
+test('an impossible key is refused with a readable note', async () => {
+  const { page } = await open();
+  await page.selectOption('#rotor-1', 'II');
+  await page.click('#key-form button[type="submit"]');
+  assert.match(await page.textContent('#sheet-note'), /only be used once/);
+  await page.fill('#stecker', 'AB BC');
+  await page.selectOption('#rotor-1', 'IV');
+  await page.click('#key-form button[type="submit"]');
+  assert.match(await page.textContent('#sheet-note'), /plugged more than once/);
+  await page.close();
+});
+
+for (const id of ['H1', 'H2', 'H5']) {
+  const vector = HISTORICAL.find((h) => h.id === id);
+  test(`${id}: loading "${vector.name}" deciphers it through the keys and lamps`, async () => {
+    const { page } = await open({ width: 1600, height: 1200 });
+    await page.evaluate((mid) => window.enigma.play(mid, { perSecond: 60 }), id);
+    const state = await uiState(page);
+    assert.equal(state.padOut, vector.plaintext);
+    assert.equal(state.padIn, vector.ciphertext.replace(/[^A-Z]/g, ''));
+    if (vector.finalPositions) assert.equal(await positions(page), vector.finalPositions);
+    assert.equal(await pairsOf(page), new E.Machine(vector.setup).pairs().join(' '));
+    assert.ok(await page.locator('.archive .reading').isVisible(), 'the reading is shown');
+    await page.close();
+  });
+}

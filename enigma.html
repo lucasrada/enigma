@@ -180,6 +180,32 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background-size: auto, 180px 180px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7), inset 0 2px 5px rgba(0, 0, 0, .8);
 }
+.machine[data-model='M4'] .plate {
+  background-image:
+    linear-gradient(170deg, rgba(255, 238, 210, .10), rgba(255, 238, 210, 0) 45%, rgba(0, 0, 0, .28) 100%),
+    linear-gradient(rgba(86, 88, 86, .32), rgba(86, 88, 86, .32)),
+    var(--tex-crackle, none);
+  background-size: auto, auto, 180px 180px;
+}
+.cover-lock {
+  position: absolute;
+  width: 34px;
+  height: 46px;
+  margin: -23px 0 0 -17px;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #e3cd8f, #9e7f3e 60%, #6a5222);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.cover-lock::after { /* keyhole */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 9px;
+  height: 20px;
+  margin-left: -4.5px;
+  background: radial-gradient(circle at 50% 4.5px, #1a140a 4px, transparent 4.5px), linear-gradient(#1a140a, #1a140a) 50% 8px / 4px 12px no-repeat;
+}
 .seam { /* the edge of the hinged cover between the lampboard and the keyboard */
   position: absolute;
   left: 8px;
@@ -672,7 +698,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transform: rotate(6deg);
 }
 .tilt-l { transform: rotate(-.7deg); }
-.stamp.low { top: auto; bottom: 18px; right: 18px; transform: rotate(-7deg); }
+.stamp.low { top: auto; bottom: 16px; right: 16px; transform: rotate(-7deg); }
+#pad .sub { padding-right: 70px; }
 .tilt-r { transform: rotate(.6deg); }
 .field { display: grid; gap: 3px; margin-bottom: 13px; }
 .field > label, .field > .label {
@@ -739,6 +766,9 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
 .groups {
   margin: 0;
   min-height: 3.2em;
+  max-height: 9.4em;
+  overflow-y: auto;
+  scrollbar-width: thin;
   font: 400 19px/1.55 var(--font-type);
   letter-spacing: .1em;
   word-spacing: .35em;
@@ -761,6 +791,21 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   cursor: pointer;
 }
 .archive button:hover { background: rgba(255, 255, 255, .3); }
+.archive li.playing button { background: rgba(155, 47, 37, .10); }
+.archive .reading {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--stamp);
+  background: rgba(255, 255, 255, .28);
+  font: 400 15px/1.45 var(--font-type);
+}
+.archive .reading p { margin: 0 0 6px; }
+.archive .reading .en { font: 500 15px/1.4 var(--font-machine); color: var(--paper-ink); }
+.archive .reading a { color: var(--stamp); font: 500 13px/1.3 var(--font-machine); }
+.setting { width: 2.7em; text-align: center; }
+select.typed { min-width: 3.6em; }
+#stecker { width: 100%; resize: none; }
+.sheet-hint { font: 500 14px/1.35 var(--font-machine); color: var(--paper-faint); margin: -6px 0 10px; }
 .archive .year { font: 400 17px/1.25 var(--font-type); }
 .archive .what { font: 400 16px/1.25 var(--font-type); }
 .archive .how { grid-column: 2; font: 500 12.5px/1.3 var(--font-machine); letter-spacing: .04em; color: var(--paper-faint); }
@@ -819,11 +864,11 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
           </div>
           <div class="field">
             <label for="stecker">Steckerverbindungen <b>· plug pairs</b></label>
-            <input class="typed" id="stecker" spellcheck="false" autocapitalize="characters">
+            <textarea class="typed" id="stecker" rows="2" spellcheck="false" autocapitalize="characters"></textarea>
           </div>
           <div class="row">
             <button class="paper-button primary" type="submit">Einstellen · set</button>
-            <button class="paper-button" type="button" id="sheet-reset">Grundschlüssel · default</button>
+            <button class="paper-button" type="button" id="sheet-reset">Zurück · reset</button>
           </div>
           <p class="note" id="sheet-note" role="status"></p>
         </form>
@@ -832,6 +877,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       <section class="paper tilt-r" id="archive-card" aria-labelledby="archive-title">
         <h2 id="archive-title">Funksprüche</h2>
         <p class="sub">Historical messages · load and decipher</p>
+        <p class="sheet-hint">The machine opens on the real key of the Barbarossa message (Heer, 7 July 1941). Pick a message to set the key and watch it decipher.</p>
         <ul class="archive" id="archive"></ul>
       </section>
     </div>
@@ -1673,6 +1719,8 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       view.wheels.push({ node: wheel, canvas: knurl });
     });
     for (const x of [72, G.plateW - 72]) plate.append(place(el('span', { class: 'nut' }), x, 226));
+    // The M4's rotor cover could be locked (RESEARCH.md §4.7).
+    if (slots === 4) plate.append(place(el('span', { class: 'cover-lock', 'aria-hidden': 'true' }), 230, G.rotorY));
 
     const power = place(el('button', { class: 'power', type: 'button', id: 'power' }), 790, 108);
     power.append(el('span', { class: 'power-plate' }));
@@ -1958,8 +2006,11 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   }
 
   function renderPad() {
-    $('#pad-in').textContent = groups(state.padIn);
-    $('#pad-out').textContent = groups(state.padOut);
+    for (const [id, text] of [['#pad-in', state.padIn], ['#pad-out', state.padOut]]) {
+      const node = $(id);
+      node.textContent = groups(text);
+      node.scrollTop = node.scrollHeight; // keep the newest letters in view
+    }
   }
 
   let noteTimer = 0;
@@ -2055,7 +2106,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     const cable = {
       id: cables.length,
       ends: [{ socket: null }, { socket: null }],
-      flight: [null, null],
+      morph: null, // an animated re-plug: the whole rope eases into a new shape
       x: new Float32Array(n), y: new Float32Array(n),
       px: new Float32Array(n), py: new Float32Array(n),
       tone: 0.85 + 0.3 * mulberry32(cables.length + 7)(),
@@ -2116,15 +2167,8 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     return null;
   }
 
-  // Where an end is pinned this frame: in a socket, in the hand, or in flight.
-  function pinOf(cable, k, now) {
-    const f = cable.flight[k];
-    if (f) {
-      const t = clamp((now - f.t0) / f.dur, 0, 1);
-      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      const to = socketAt(f.to);
-      return { x: lerp(f.x, to.x, e), y: lerp(f.y, to.y, e) - Math.sin(Math.PI * e) * 60 };
-    }
+  // Where an end is pinned this frame: in a socket or in the hand.
+  function pinOf(cable, k) {
     if (held && held.cable === cable && held.k === k && held.lifted) {
       if (hover) return socketAt(hover);
       return { x: held.x, y: held.y };
@@ -2133,65 +2177,72 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     return socket ? socketAt(socket) : null;
   }
 
-  function simulate(now, dt) {
+  function simulate(dt) {
+    let motion = 0;
+    for (const c of cables) {
+      if (c.morph) continue;
+      motion = Math.max(motion, stepCable(c, [pinOf(c, 0), pinOf(c, 1)], dt));
+    }
+    return motion;
+  }
+
+  // One Verlet step for one rope with its end pins (null = free end).
+  function stepCable(c, pins, dt) {
     const g = 2600;
     const seg = ROPE.length / ROPE.n;
     let motion = 0;
-    for (const c of cables) {
-      const pins = [pinOf(c, 0, now), pinOf(c, 1, now)];
-      for (let i = 0; i <= ROPE.n; i++) {
-        const pin = i === 0 ? pins[0] : i === ROPE.n ? pins[1] : null;
-        if (pin) {
-          c.px[i] = c.x[i];
-          c.py[i] = c.y[i];
-          c.x[i] = pin.x;
-          c.y[i] = pin.y;
-          continue;
-        }
-        const grounded = c.y[i] >= FLOOR - 0.5;
-        const damp = reducedMotion ? 0.94 : 0.992;
-        const vx = (c.x[i] - c.px[i]) * (grounded ? 0.55 : damp);
-        const vy = (c.y[i] - c.py[i]) * damp;
-        motion = Math.max(motion, Math.abs(vx) + Math.abs(vy));
+    for (let i = 0; i <= ROPE.n; i++) {
+      const pin = i === 0 ? pins[0] : i === ROPE.n ? pins[1] : null;
+      if (pin) {
         c.px[i] = c.x[i];
         c.py[i] = c.y[i];
-        c.x[i] += vx;
-        c.y[i] += vy + g * dt * dt;
+        c.x[i] = pin.x;
+        c.y[i] = pin.y;
+        continue;
       }
-      const fixed = (i) => (i === 0 && pins[0]) || (i === ROPE.n && pins[1]);
-      for (let iter = 0; iter < 22; iter++) {
-        for (let i = 0; i < ROPE.n; i++) {
-          const dx = c.x[i + 1] - c.x[i];
-          const dy = c.y[i + 1] - c.y[i];
-          const d = Math.hypot(dx, dy) || 0.0001;
-          const diff = (d - seg) / d;
-          const wa = fixed(i) ? 0 : 1;
-          const wb = fixed(i + 1) ? 0 : 1;
-          if (wa + wb === 0) continue;
-          const ka = (wa / (wa + wb)) * diff;
-          const kb = (wb / (wa + wb)) * diff;
-          c.x[i] += dx * ka;
-          c.y[i] += dy * ka;
-          c.x[i + 1] -= dx * kb;
-          c.y[i + 1] -= dy * kb;
-        }
-        // A little bending stiffness: fabric cable doesn't fold sharply.
-        for (let i = 0; i < ROPE.n - 1; i++) {
-          const dx = c.x[i + 2] - c.x[i];
-          const dy = c.y[i + 2] - c.y[i];
-          const d = Math.hypot(dx, dy) || 0.0001;
-          const min = seg * 1.55;
-          if (d >= min) continue;
-          const k = ((min - d) / d) * 0.12;
-          if (!fixed(i)) { c.x[i] -= dx * k; c.y[i] -= dy * k; }
-          if (!fixed(i + 2)) { c.x[i + 2] += dx * k; c.y[i + 2] += dy * k; }
-        }
-        for (let i = 0; i <= ROPE.n; i++) {
-          if (fixed(i)) continue;
-          if (c.y[i] > FLOOR) c.y[i] = FLOOR;
-          if (c.y[i] < CAN.top + 12) c.y[i] = CAN.top + 12;
-          c.x[i] = clamp(c.x[i], -30, CAN.w + 30);
-        }
+      const grounded = c.y[i] >= FLOOR - 0.5;
+      const damp = reducedMotion ? 0.94 : 0.992;
+      const vx = (c.x[i] - c.px[i]) * (grounded ? 0.55 : damp);
+      const vy = (c.y[i] - c.py[i]) * damp;
+      motion = Math.max(motion, Math.abs(vx) + Math.abs(vy));
+      c.px[i] = c.x[i];
+      c.py[i] = c.y[i];
+      c.x[i] += vx;
+      c.y[i] += vy + g * dt * dt;
+    }
+    const fixed = (i) => (i === 0 && pins[0]) || (i === ROPE.n && pins[1]);
+    for (let iter = 0; iter < 22; iter++) {
+      for (let i = 0; i < ROPE.n; i++) {
+        const dx = c.x[i + 1] - c.x[i];
+        const dy = c.y[i + 1] - c.y[i];
+        const d = Math.hypot(dx, dy) || 0.0001;
+        const diff = (d - seg) / d;
+        const wa = fixed(i) ? 0 : 1;
+        const wb = fixed(i + 1) ? 0 : 1;
+        if (wa + wb === 0) continue;
+        const ka = (wa / (wa + wb)) * diff;
+        const kb = (wb / (wa + wb)) * diff;
+        c.x[i] += dx * ka;
+        c.y[i] += dy * ka;
+        c.x[i + 1] -= dx * kb;
+        c.y[i + 1] -= dy * kb;
+      }
+      // A little bending stiffness: fabric cable doesn't fold sharply.
+      for (let i = 0; i < ROPE.n - 1; i++) {
+        const dx = c.x[i + 2] - c.x[i];
+        const dy = c.y[i + 2] - c.y[i];
+        const d = Math.hypot(dx, dy) || 0.0001;
+        const min = seg * 1.55;
+        if (d >= min) continue;
+        const k = ((min - d) / d) * 0.12;
+        if (!fixed(i)) { c.x[i] -= dx * k; c.y[i] -= dy * k; }
+        if (!fixed(i + 2)) { c.x[i + 2] += dx * k; c.y[i + 2] += dy * k; }
+      }
+      for (let i = 0; i <= ROPE.n; i++) {
+        if (fixed(i)) continue;
+        if (c.y[i] > FLOOR) c.y[i] = FLOOR;
+        if (c.y[i] < CAN.top + 12) c.y[i] = CAN.top + 12;
+        c.x[i] = clamp(c.x[i], -30, CAN.w + 30);
       }
     }
     return motion;
@@ -2341,17 +2392,15 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       ctx.lineWidth = 3;
       ctx.stroke();
     }
-    const now = performance.now();
     for (const c of order) {
       for (const k of [0, 1]) {
         const lifted = held && held.cable === c && held.k === k && held.lifted;
         const i = endIndex(k);
-        if (c.ends[k].socket || (lifted && hover)) {
+        if (c.morph?.seat) {
+          drawSeatedPlug(ctx, c.x[i], c.y[i], c.morph.t < 1);
+        } else if (c.ends[k].socket || (lifted && hover)) {
           const at = lifted ? socketAt(hover) : socketAt(c.ends[k].socket);
           drawSeatedPlug(ctx, at.x, at.y, lifted);
-        } else if (c.flight[k]) {
-          const p = pinOf(c, k, now);
-          drawSeatedPlug(ctx, p.x, p.y, true);
         } else {
           drawLoosePlug(ctx, c, k, lifted);
         }
@@ -2360,23 +2409,44 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     ctx.restore();
   }
 
+  // Ease a morphing cable toward its target shape; the rope arcs up as if
+  // lifted by hand, and the physics takes over again once it lands.
+  function stepMorph(c, now) {
+    const m = c.morph;
+    m.t = clamp((now - m.t0) / m.dur, 0, 1);
+    if (m.t <= 0) return true;
+    const e = m.t < 0.5 ? 2 * m.t * m.t : 1 - Math.pow(-2 * m.t + 2, 2) / 2;
+    const lift = Math.sin(Math.PI * e) * m.lift;
+    for (let i = 0; i <= ROPE.n; i++) {
+      c.x[i] = lerp(m.fx[i], m.tx[i], e);
+      c.y[i] = lerp(m.fy[i], m.ty[i], e) - lift * Math.sin((Math.PI * i) / ROPE.n) * 0.6 - lift * 0.4;
+    }
+    if (m.t < 1) return true;
+    c.morph = null;
+    c.px.set(c.x);
+    c.py.set(c.y);
+    // a small push so the cable settles with a little swing
+    for (let i = 1; i < ROPE.n; i++) c.px[i] -= Math.sin((Math.PI * i) / ROPE.n) * 1.5;
+    if (m.seat) {
+      c.ends[0].socket = m.seat[0];
+      c.ends[1].socket = m.seat[1];
+      sound.plugIn();
+      setTimeout(() => sound.plugIn(), 70);
+      applyPlugs();
+    } else {
+      cables.splice(cables.indexOf(c), 1);
+      renderLidSpares();
+    }
+    return false;
+  }
+
   function cableTask(now) {
     const dt = 1 / 120;
     let motion = 0;
-    for (let i = 0; i < 2; i++) motion = Math.max(motion, simulate(now, dt));
+    for (let i = 0; i < 2; i++) motion = Math.max(motion, simulate(dt));
     let flying = false;
-    for (const c of cables) {
-      for (const k of [0, 1]) {
-        const f = c.flight[k];
-        if (!f) continue;
-        if (now - f.t0 >= f.dur) {
-          c.flight[k] = null;
-          c.ends[k].socket = f.to;
-          sound.plugIn();
-          f.done?.();
-        } else flying = true;
-      }
-    }
+    for (const c of [...cables]) if (c.morph && stepMorph(c, now)) flying = true;
+    if (!flying && settleWaiters.length) settleWaiters.splice(0).forEach((resolve) => resolve());
     drawCables();
     calm = motion < 0.03 && !flying && !held ? calm + 1 : 0;
     return calm < 45;
@@ -2421,7 +2491,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     const order = [...cables].reverse();
     for (const c of order) {
       for (const k of [0, 1]) {
-        if (c.flight[k]) continue;
+        if (c.morph) continue;
         const socket = c.ends[k].socket;
         const i = endIndex(k);
         const x = socket ? socketAt(socket).x : c.x[i];
@@ -2575,6 +2645,10 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   }
 
   const lidSpares = () => SUPPLIED - cables.length;
+  const settleWaiters = [];
+  const cablesSettled = () => (cables.some((c) => c.morph)
+    ? new Promise((resolve) => settleWaiters.push(resolve))
+    : Promise.resolve());
 
   function renderLidSpares() {
     // SVG elements have no .hidden property; toggle the attribute itself.
@@ -2591,18 +2665,33 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   }
 
   function spareCable() {
-    return cables.find((c) => !c.ends[0].socket && !c.ends[1].socket && !c.flight[0] && !c.flight[1] && held?.cable !== c)
+    return cables.find((c) => !c.ends[0].socket && !c.ends[1].socket && !c.morph && held?.cable !== c)
       ?? takeFromLid(505, CAN.top + 20);
+  }
+
+  // The shape a cable settles into between two sockets, found by running the
+  // same physics on a scratch rope.
+  function restingShape(a, b) {
+    const scratch = { x: new Float32Array(ROPE.n + 1), y: new Float32Array(ROPE.n + 1), px: new Float32Array(ROPE.n + 1), py: new Float32Array(ROPE.n + 1) };
+    hangBetween(scratch, a, b);
+    const pins = [socketAt(a), socketAt(b)];
+    for (let i = 0; i < 260; i++) stepCable(scratch, pins, 1 / 120);
+    return scratch;
+  }
+
+  function startMorph(cable, target, { seat = null, delay = 0, lift = 70, dur = 520 } = {}) {
+    cable.morph = {
+      fx: Float32Array.from(cable.x), fy: Float32Array.from(cable.y),
+      tx: target.x, ty: target.y, seat, lift,
+      t0: performance.now() + delay, dur: reducedMotion ? 1 : dur, t: 0,
+    };
   }
 
   function connect(a, b, delay = 0) {
     const cable = spareCable();
     if (!cable) return false;
-    const now = performance.now() + delay;
-    [a, b].forEach((letter, k) => {
-      const i = endIndex(k);
-      cable.flight[k] = { x: cable.x[i], y: cable.y[i], to: letter, t0: now + k * 90, dur: reducedMotion ? 1 : 420, done: () => applyPlugs() };
-    });
+    for (const end of cable.ends) end.socket = null;
+    startMorph(cable, restingShape(a, b), { seat: [a, b], delay });
     wake();
     return true;
   }
@@ -2615,12 +2704,30 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   }
 
   // Rewire the plugboard to exactly these pairs, animating the changes.
+  // Put a cable back in the lid: it rises out of view above the keyboard.
+  function stow(cable, delay) {
+    const target = { x: new Float32Array(ROPE.n + 1), y: new Float32Array(ROPE.n + 1) };
+    for (let i = 0; i <= ROPE.n; i++) {
+      target.x[i] = 140 + 40 * Math.sin(i / 3);
+      target.y[i] = CAN.top - 60 - i * 4;
+    }
+    for (const end of cable.ends) end.socket = null;
+    startMorph(cable, target, { delay, lift: 0, dur: 560 });
+  }
+
   function setPairs(pairs) {
+    if (held) return cablesSettled();
+    // Land anything still in the air, then compare with what is wanted.
+    for (const c of [...cables]) {
+      if (!c.morph) continue;
+      c.morph.t0 = -Infinity;
+      stepMorph(c, performance.now());
+    }
     const want = new Map(pairs.map((p) => [[...p].sort().join(''), p]));
     for (const c of cables) {
       const key = c.ends.map((e) => e.socket).filter(Boolean).sort().join('');
       if (key.length === 2 && want.has(key)) want.delete(key);
-      else if (c.ends.some((e) => e.socket)) for (const e of c.ends) e.socket = null;
+      else for (const e of c.ends) e.socket = null;
     }
     applyPlugs();
     let delay = 0;
@@ -2628,7 +2735,15 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       connect(pair[0], pair[1], delay);
       delay += 110;
     }
+    for (const c of cables) {
+      if (!c.ends[0].socket && !c.ends[1].socket && !c.morph) {
+        stow(c, delay);
+        delay += 80;
+      }
+    }
+    renderLidSpares();
     wake();
+    return cablesSettled();
   }
 
   function initCables(pairs) {
@@ -2641,8 +2756,7 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       c.ends[1].socket = pair[1];
       hangBetween(c, pair[0], pair[1]);
     });
-    const t = performance.now();
-    for (let i = 0; i < 360; i++) simulate(t, 1 / 120);
+    for (let i = 0; i < 360; i++) simulate(1 / 120);
     applyPlugs();
     renderLidSpares();
   }
@@ -2746,15 +2860,316 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
       if (k && k === state.down && !state.feeding) release(k);
     });
     window.addEventListener('blur', () => { if (!state.feeding) release(); });
+    $('#pad-clear').addEventListener('click', clearPad);
+    $('#pad-copy').addEventListener('click', copyPad);
+    $('#feed-go').addEventListener('click', () => feed($('#feed-text').value));
+    $('#feed-stop').addEventListener('click', stopPlayback);
+    $('#feed-speed').addEventListener('input', (e) => { $('#feed-speed-out').value = e.target.value; });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Setting up the machine: the key sheet (Maschinenschlüssel)
+  // ---------------------------------------------------------------------------
+  function bindPlate() {
+    bindKeys();
+    bindWheels();
     $('#power').addEventListener('click', () => {
       setPower(state.power + 1);
       sound.click();
     });
-    $('#pad-clear').addEventListener('click', clearPad);
-    $('#pad-copy').addEventListener('click', copyPad);
-    $('#feed-go').addEventListener('click', () => feed($('#feed-text').value));
-    $('#feed-stop').addEventListener('click', () => { state.feeding = false; });
-    $('#feed-speed').addEventListener('input', (e) => { $('#feed-speed-out').value = e.target.value; });
+    setPower(state.power);
+  }
+
+  const UKW_LABEL = { A: 'UKW A', B: 'UKW B', C: 'UKW C', 'B-thin': 'UKW B dünn', 'C-thin': 'UKW C dünn' };
+  const WHEEL_LABEL = { Beta: 'β', Gamma: 'γ' };
+  const label = (index) => E.labelFor(state.machine.model, index);
+
+  // Apply a complete key. Rotors and reflector change at once (the operator
+  // would open the cover and swap them); the windows roll and the cables are
+  // re-plugged with animation. Resolves once every plug is seated.
+  function configure(config, { animate = true } = {}) {
+    const full = { ...state.machine.config(), ...config };
+    delete full.open;
+    const check = new E.Machine(full); // throws EnigmaError on a bad key
+    const pairs = check.pairs();
+    if (pairs.length > SUPPLIED) throw new E.EnigmaError(`This machine has ${SUPPLIED} cables, so at most ${SUPPLIED} plug pairs.`);
+    if (held) throw new E.EnigmaError('Put the plug you are holding down first.');
+    release();
+    const next = new E.Machine({ ...full, plugboard: '' });
+    const modelChanged = next.model !== state.machine.model;
+    state.machine = next;
+    if (modelChanged) {
+      $('#machine').dataset.model = next.model;
+      buildPlate(next.model);
+      bindPlate();
+      state.shown = [];
+      state.roll = [];
+    }
+    applyPlugs();
+    syncRotors({ immediate: !animate || modelChanged });
+    const settled = setPairs(pairs);
+    renderSheet();
+    emit('config');
+    return settled;
+  }
+
+  function renderSheet() {
+    const m = state.machine;
+    const model = E.MODELS[m.model];
+    $(`#model-${m.model}`).checked = true;
+    const ukw = $('#ukw');
+    ukw.replaceChildren(...model.reflectors.map((r) => el('option', { value: r }, UKW_LABEL[r])));
+    ukw.value = m.reflector;
+    const order = $('#order');
+    order.replaceChildren(...m.rotors.map((rotor, i) => {
+      const names = model.greek.length && i === 0 ? model.greek : model.rotors;
+      const select = el('select', { class: 'typed', id: `rotor-${i}`, 'aria-label': i === 0 && model.greek.length ? 'Greek wheel' : `Rotor ${i + 1 - (model.greek.length ? 1 : 0)} (left to right)` },
+        names.map((n) => el('option', { value: n }, WHEEL_LABEL[n] || n)));
+      select.value = rotor.name;
+      return select;
+    }));
+    const settingInputs = (host, kind, values) => host.replaceChildren(...values.map((v, i) => el('input', {
+      class: 'typed setting', id: `${kind}-${i}`, value: label(v), maxlength: '2', inputmode: m.model === 'I' ? 'numeric' : 'text',
+      spellcheck: 'false', autocapitalize: 'characters',
+      'aria-label': `${kind === 'ring' ? 'Ring setting' : 'Start position'} of wheel ${i + 1}`,
+    })));
+    settingInputs($('#rings'), 'ring', m.rotors.map((r) => r.ring));
+    settingInputs($('#starts'), 'start', m.rotors.map((r) => r.position));
+    syncSheetLive();
+  }
+
+  // Keep the sheet's start positions and plug pairs in step with the machine,
+  // except for the field the user is typing in.
+  function syncSheetLive() {
+    const m = state.machine;
+    m.rotors.forEach((rotor, i) => {
+      const input = $(`#start-${i}`);
+      if (input && document.activeElement !== input) input.value = label(rotor.position);
+    });
+    const stecker = $('#stecker');
+    if (document.activeElement !== stecker) {
+      const open = m.config().open;
+      stecker.value = m.pairs().join(' ') + (open ? `  (${[...open].join(', ')} loose)` : '');
+    }
+  }
+
+  function readSheet() {
+    const count = state.machine.slots;
+    const model = document.querySelector('input[name="model"]:checked').value;
+    const values = (kind) => Array.from({ length: count }, (_, i) => $(`#${kind}-${i}`).value.trim() || '01');
+    return {
+      model,
+      reflector: $('#ukw').value,
+      rotors: Array.from({ length: count }, (_, i) => $(`#rotor-${i}`).value),
+      rings: values('ring'),
+      positions: values('start'),
+      plugboard: $('#stecker').value.replace(/\(.*\)/, '').trim(),
+    };
+  }
+
+  function sheetNote(text) {
+    $('#sheet-note').textContent = text;
+  }
+
+  function bindSheet() {
+    $('#key-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      try {
+        configure(readSheet());
+        sheetNote('');
+        live.textContent = 'Machine set.';
+      } catch (err) {
+        sheetNote(err.message);
+      }
+    });
+    // Choosing a model swaps in that model's standard wheels straight away.
+    document.querySelectorAll('input[name="model"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        const model = E.MODELS[radio.value];
+        const keep = state.machine.pairs().join(' ');
+        try {
+          configure({ model: radio.value, reflector: model.defaults.reflector, rotors: [...model.defaults.rotors], rings: null, positions: null, plugboard: keep });
+          sheetNote('');
+        } catch (err) {
+          sheetNote(err.message);
+        }
+      });
+    });
+    $('#sheet-reset').addEventListener('click', () => {
+      configure(DEFAULT_KEY);
+      sheetNote('');
+    });
+    listeners.add((type) => {
+      if (type === 'press' || type === 'rotors' || type === 'plugboard') syncSheetLive();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Historical messages (RESEARCH.md §2.2): load a key, run the indicator
+  // procedure, and let the machine type the message.
+  // ---------------------------------------------------------------------------
+  const ARCHIVE = [
+    {
+      id: 'H1', year: '1930', title: 'Enigma I manual, test message',
+      how: 'Enigma I · UKW A · II I III · 6 cables',
+      key: { model: 'I', reflector: 'A', rotors: ['II', 'I', 'III'], rings: '24 13 22', plugboard: 'AM FI NV PS TU WZ' },
+      indicator: { start: 'FOL', cipher: 'PKPJXI', doubled: true },
+      ciphertext: 'GCDSE AHUGW TQGRK VLFGX UCALX VYMIG MMNMF DXTGN VHVRM MEVOU YFZSL RHDRR XFJWC FHUHM UNZEF RDISI KBGPM YVXUZ',
+      reading: 'Feindliche Infanteriekolonne beobachtet. Anfang Südausgang Bärwalde. Ende 3 km ostwärts Neustadt.',
+      english: 'Enemy infantry column observed. Head at the southern exit of Bärwalde, tail 3 km east of Neustadt.',
+      source: 'https://cryptocellar.org/enigma/e-message-1930.html',
+    },
+    {
+      id: 'H2', year: '1941', title: 'Operation Barbarossa, part 1',
+      how: 'Enigma I · UKW B · II IV V · 10 cables',
+      key: { model: 'I', reflector: 'B', rotors: ['II', 'IV', 'V'], rings: '02 21 12', plugboard: 'AV BS CG DL FU HZ IN KM OW RX' },
+      indicator: { start: 'WXC', cipher: 'KCH' },
+      kenngruppe: 'RFUGZ',
+      ciphertext: 'EDPUD NRGYS ZRCXN UYTPO MRMBO FKTBZ REZKM LXLVE FGUEY SIOZV EQMIK UBPMM YLKLT TDEIS MDICA GYKUA CTCDO MOHWX MUUIA UBSTS LRNBZ SZWNR FXWFY SSXJZ VIJHI DISHP RKLKA YUPAD TXQSP INQMA TLPIF SVKDA SCTAC DPBOP VHJK',
+      reading: 'Aufkl. Abteilung von Kurtinowa nordwestl. Sebez [auf] Fliegerstraße Richtung Dubrowki, Opotschka. Um 18:30 Uhr angetreten. Angriff Inf. Rgt.',
+      english: 'Reconnaissance battalion from Kurtinowa, north-west of Sebez, [along the] air-route towards Dubrowki and Opotschka. Moved off at 18:30. Infantry regiment attacking.',
+      source: 'http://wiki.franklinheath.co.uk/index.php/Enigma/Sample_Messages',
+    },
+    {
+      id: 'H3', year: '1941', title: 'Operation Barbarossa, part 2',
+      how: 'Enigma I · same day key',
+      key: { model: 'I', reflector: 'B', rotors: ['II', 'IV', 'V'], rings: '02 21 12', plugboard: 'AV BS CG DL FU HZ IN KM OW RX' },
+      indicator: { start: 'CRS', cipher: 'YPJ' },
+      kenngruppe: 'FNJAU',
+      ciphertext: 'SFBWD NJUSE GQOBH KRTAR EEZMW KPPRB XOHDR OEQGB BGTQV PGVKB VVGBI MHUSZ YDAJQ IROAX SSSNR EHYGG RPISE ZBOVM QIEMM ZCYSG QDGRE RVBIL EKXYQ IRGIR QNRDN VRXCY YTNJR',
+      reading: 'Drei geht langsam aber sicher vorwärts. 17:06 Uhr. Röm. I Inf. Rgt. 3 auf Fliegerstraße, Anfang 16 km ostw. Kamenec.',
+      english: '3 is advancing slowly but surely. 17:06. I/Infantry Regiment 3 on the air-route, head 16 km east of Kamenec.',
+      source: 'https://www.ciphermachinesandcryptology.com/files/Enigma%20Sim%20Manual.pdf',
+    },
+    {
+      id: 'H5', year: '1942', title: 'U-264, Kapitänleutnant Looks',
+      how: 'M4 · UKW B dünn · β II IV I · broken in 2006',
+      key: { model: 'M4', reflector: 'B-thin', rotors: ['Beta', 'II', 'IV', 'I'], rings: 'A A A V', plugboard: 'AT BL DF GJ HM NW OP QY RZ VX' },
+      messageKey: 'VJNA',
+      ciphertext: 'NCZW VUSX PNYM INHZ XMQX SFWX WLKJ AHSH NMCO CCAK UQPM KCSM HKSE INJU SBLK IOSX CKUB HMLL XCSJ USRR DVKO HULX WCCB GVLI YXEO AHXR HKKF VDRE WEZL XOBA FGYU JQUK GRTV UKAM EURB VEKS UHHV OYHA BCJW MAKL FKLM YFVN RIZR VVRT KOFD ANJM OLBG FFLE OPRG TFLV RHOW OPBE KVWM UQFM PWPA RMFH AGKX IIBG',
+      reading: 'Von Looks: Funkspruch 1132/19. Inhalt: Bei Angriff unter Wasser gedrückt, Wabos. Letzter Gegnerstand 08:30 Uhr, Marqu. AJ 9863, 220 Grad, 8 sm, stoße nach. 14 mb fällt, NNO 4, Sicht 10.',
+      english: 'From Looks: radio signal 1132/19. Contents: forced to submerge during attack, depth charges. Last enemy position 08:30, square AJ 9863, 220°, 8 nautical miles, following. Barometer 1014 mb falling, NNE 4, visibility 10.',
+      source: 'https://www.bytereef.org/m4-project-first-break.html',
+    },
+    {
+      id: 'H4', year: '1943', title: 'Scharnhorst, Konteradmiral Bey',
+      how: 'M3 · UKW B · III VI VIII',
+      key: { model: 'M3', reflector: 'B', rotors: ['III', 'VI', 'VIII'], rings: 'A H M', plugboard: 'AN EZ HK IJ LR MQ OT PV SW UX' },
+      messageKey: 'UZV',
+      ciphertext: 'YKAE NZAP MSCH ZBFO CUVM RMDP YCOF HADZ IZME FXTH FLOL PZLF GGBO TGOX GRET DWTJ IQHL MXVJ WKZU ASTR',
+      reading: 'Steuere „Tanafjord“ an. Standort Qu. AC 4992, Fahrt 20 sm. Scharnhorst. HCO',
+      english: 'Am steering for the Tanafjord. Position square AC 4992, speed 20 knots. Scharnhorst. (HCO: not explained in the sources.)',
+      source: 'https://www.bytereef.org/m4-project-scharnhorst-break.html',
+    },
+    {
+      id: 'H8', year: '1945', title: 'Dönitz named Hitler’s successor',
+      how: 'M4 · UKW C dünn · β V VI VIII · from U-534',
+      key: { model: 'M4', reflector: 'C-thin', rotors: ['Beta', 'V', 'VI', 'VIII'], rings: 'E P E L', plugboard: 'AE BF CM DQ HU JN LX PR SZ VW' },
+      messageKey: 'CDSZ',
+      ciphertext: 'LANOTCTOUARBBFPMHPHGCZXTDYGAHGUFXGEWKBLKGJWLQXXTGPJJAVTOCKZFSLPPQIHZFXOEBWIIEKFZLCLOAQJULJOYHSSMBBGWHZANVOIIPYRBRTDJQDJJOQKCXWDNBBTYVXLYTAPGVEATXSONPNYNQFUDBBHHVWEPYEYDOHNLXKZDNWRHDUWUJUMWWVIIWZXIVIUQDRHYMNCYEFUAPNHOTKHKGDNPSAKNUAGHJZSMJBMHVTREQEDGXHLZWIFUSKDQVELNMIMITHBHDBWVHDFYHJOQIHORTDJDBWXEMEAYXGYQXOHFDMYUXXNOJAZRSGHPLWMLRECWWUTLRTTVLBHYOORGLGOWUXNXHMHYFAACQEKTHSJW',
+      reading: 'KR KR – an alle. Folgendes ist sofort bekanntzugeben: Ich habe folgenden Befehl erhalten: An Stelle des bisherigen Reichsmarschalls Göring setzt der Führer Sie, Herr Großadmiral, als seinen Nachfolger ein. Schriftliche Vollmacht unterwegs. Ab sofort sollen Sie sämtliche Maßnahmen verfügen, die sich aus der gegenwärtigen Lage ergeben. Gez. Reichsleiter Bormann.',
+      english: 'Most urgent – to all. The following is to be announced at once: I have received this order: in place of the former Reich Marshal Göring, the Führer appoints you, Grand Admiral, as his successor. Written authority is on its way. You are to order at once every measure the present situation requires. Signed, Reichsleiter Bormann.',
+      source: 'https://www.cryptomuseum.com/crypto/enigma/msg/p1030681.htm',
+    },
+  ];
+
+  let playToken = 0;
+
+  // Turn the thumbwheels to a setting one detent at a time, as an operator would.
+  async function turnTo(target) {
+    const want = E.parseSettings(target, state.machine.slots, 'Rotor position').map((c) => A.indexOf(c));
+    const token = playToken;
+    for (let slot = 0; slot < want.length; slot++) {
+      let d = mod(want[slot] - state.machine.rotors[slot].position, 26);
+      if (d > 13) d -= 26;
+      const dir = Math.sign(d);
+      for (let i = 0; i < Math.abs(d); i++) {
+        if (token !== playToken) return false;
+        turn(slot, dir);
+        await sleep(reducedMotion ? 0 : 38);
+      }
+    }
+    return true;
+  }
+
+  function stopPlayback() {
+    playToken++;
+    state.feeding = false;
+    document.querySelectorAll('.archive li').forEach((li) => li.classList.remove('playing'));
+  }
+
+  async function playMessage(entry, { perSecond } = {}) {
+    stopPlayback();
+    const token = ++playToken;
+    const item = document.querySelector(`.archive li[data-id="${entry.id}"]`);
+    item?.classList.add('playing');
+    const speed = perSecond ?? Math.max(12, Number($('#feed-speed').value));
+    const alive = () => token === playToken;
+    const fmt = (setting) => (state.machine.model === 'I'
+      ? E.parseSettings(setting, state.machine.slots).map((c) => label(A.indexOf(c))).join(' ')
+      : setting);
+    try {
+      clearPad();
+      renderReading(null);
+      padNote(`Setting the key for “${entry.title}”…`, 0);
+      await configure({ ...entry.key, positions: entry.indicator?.start ?? entry.messageKey });
+      if (!alive()) return;
+      await sleep(250);
+      let key = entry.messageKey;
+      if (entry.indicator) {
+        const { start, cipher, doubled } = entry.indicator;
+        padNote(`① Rotors at the indicator setting ${fmt(start)}. Typing the indicator ${cipher}…`, 0);
+        await feed(cipher, { perSecond: Math.min(speed, 6) });
+        if (!alive()) return;
+        const lamps = state.padOut.slice(-cipher.length);
+        key = doubled ? lamps.slice(0, 3) : lamps;
+        const check = doubled ? ` (typed twice, as the 1930 procedure required: ${lamps})` : '';
+        padNote(`② The lamps give the message key ${key}${check}. Turning the rotors to ${fmt(key)}…`, 0);
+        await sleep(900);
+        if (!(await turnTo(key)) || !alive()) return;
+        clearPad();
+      } else {
+        padNote(`Message key ${fmt(key)}, recovered by the codebreakers (Navy indicators were enciphered with bigram tables).`, 0);
+        await sleep(900);
+      }
+      const letters = entry.ciphertext.replace(/[^A-Z]/g, '');
+      padNote(`${entry.indicator ? '③' : '①'} Typing the ${letters.length}-letter message${entry.kenngruppe ? ` (skipping the Kenngruppe ${entry.kenngruppe})` : ''}…`, 0);
+      await feed(letters, { perSecond: speed });
+      if (!alive()) return;
+      padNote('Deciphered. The reading is on the Funksprüche card.', 8000);
+      renderReading(entry);
+      live.textContent = `Deciphered: ${entry.reading}`;
+    } catch (err) {
+      padNote(err.message);
+    } finally {
+      if (alive()) item?.classList.remove('playing');
+    }
+  }
+
+  function renderReading(entry) {
+    document.querySelectorAll('.archive .reading').forEach((n) => n.remove());
+    if (!entry) return;
+    const li = document.querySelector(`.archive li[data-id="${entry.id}"]`);
+    const box = el('div', { class: 'reading' }, [
+      el('p', {}, entry.reading),
+      el('p', { class: 'en' }, entry.english),
+      el('a', { href: entry.source, target: '_blank', rel: 'noopener' }, 'Source'),
+    ]);
+    li.append(box);
+  }
+
+  function buildArchive() {
+    const list = $('#archive');
+    list.replaceChildren(...ARCHIVE.map((entry) => {
+      const button = el('button', { type: 'button', 'aria-label': `Load and decipher: ${entry.year}, ${entry.title}` }, [
+        el('span', { class: 'year' }, entry.year),
+        el('span', { class: 'what' }, entry.title),
+        el('span', { class: 'how' }, entry.how),
+      ]);
+      button.addEventListener('click', () => playMessage(entry));
+      return el('li', { dataset: { id: entry.id } }, button);
+    }));
   }
 
   // A small scripting surface, handy from the console and used by the tests.
@@ -2766,6 +3181,10 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
     type: feed,
     turn,
     setPairs,
+    configure,
+    play: (id, options) => playMessage(ARCHIVE.find((m) => m.id === id), options),
+    stop: stopPlayback,
+    cablesSettled,
     get cables() { return cables.map((c) => c.ends.map((e) => e.socket)); },
     setPower: (id) => setPower(POWER.findIndex((p) => p.id === id)),
     on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
@@ -2779,11 +3198,12 @@ input[type='range'] { width: 100%; accent-color: var(--paper-ink); }
   buildPlugboard();
   layoutScene();
   initCables(state.machine.pairs());
-  bindKeys();
-  bindWheels();
+  bindPlate();
   bindCables();
   bindGlobal();
-  setPower(0);
+  bindSheet();
+  buildArchive();
+  renderSheet();
   syncRotors({ immediate: true });
   document.fonts?.ready.then(() => syncRotors({ immediate: true }));
 })();
